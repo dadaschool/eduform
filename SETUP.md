@@ -13,20 +13,29 @@
    로그인 페이지 3개가 빌드 시점에 미리 생성되는데, 그때 Supabase 주소가 없어서 빌드가 통째로 실패했습니다.
    → **코드를 수정해 이제 환경변수가 없어도 빌드는 성공합니다.** 다만 실제로 쓰려면 등록은 해야 합니다.
 
-2. **기존 Supabase 프로젝트가 사라졌습니다.**
-   `.env.local` 이 가리키던 주소가 DNS에 존재하지 않습니다(삭제된 프로젝트).
-   그래서 새 프로젝트를 만들고 아래 SQL을 올려야 합니다.
+2. **Supabase 프로젝트가 일시정지되어 있었습니다.**
+   무료 등급은 약 1주간 요청이 없으면 자동으로 멈추고, 그때 프로젝트 주소가
+   DNS에서도 내려갑니다. 데이터는 그대로 보존됩니다.
 
 ---
 
-## 1단계 — Supabase 프로젝트 만들기
+## 1단계 — Supabase 프로젝트 깨우기
 
-1. https://supabase.com/dashboard 접속 → **New project**
-2. 입력값
-   - **Name**: `eduform`
-   - **Database Password**: 강한 비밀번호 생성 후 **어딘가에 저장** (분실 시 재설정 필요)
-   - **Region**: `Northeast Asia (Seoul)` — 한국에서 가장 빠릅니다
-3. 생성까지 2~3분 기다립니다.
+대시보드에 `Project "eduform" is paused` 가 보이면 **`Resume project`** 를 누릅니다. 재개까지 몇 분 걸립니다.
+
+- 프로젝트 주소와 API 키가 **그대로 유지**됩니다 → `.env.local` 을 고칠 필요가 없습니다.
+- **DB 비밀번호는 필요 없습니다.** 이 앱은 Postgres 에 직접 붙지 않고 REST API 를 씁니다.
+  (잊었더라도 무관합니다. 굳이 바꾸려면 Project Settings → Database → Reset database password)
+
+> ⚠️ **또 멈춥니다.** 무료 등급은 미사용 1주 후 자동 일시정지됩니다.
+> 학교에서 실제로 쓰실 거면 Pro 로 올리시거나, 방학처럼 안 쓰는 기간이 지나면
+> 다시 `Resume project` 를 눌러야 한다는 점을 기억해 두세요.
+
+**프로젝트를 새로 만드는 경우에만** 해당하는 절차:
+
+1. https://supabase.com/dashboard → **New project**
+2. **Name** `eduform` / **Region** `Northeast Asia (Seoul)` / **Database Password** 는 아무 값이나 (앱은 쓰지 않음)
+3. 생성 후 Project Settings → API 에서 키 3개를 새로 받아 `.env.local` 과 Vercel 에 반영
 
 ## 2단계 — DB 테이블 만들기
 
@@ -185,6 +194,22 @@ npm run build
 **학생이 교사 화면에 안 보인다**
 교사 화면은 `profiles.teacher_id` 기준으로 학생을 찾습니다. 초대코드로 가입하면 이 값이 자동으로 채워집니다.
 Supabase에서 직접 학생 행을 만들었다면 `teacher_id` 를 교사 UID로 채워주세요.
+
+**AI 초안 생성만 실패한다 (`PERMISSION_DENIED` 또는 `limit: 0`)**
+Gemini API 키가 속한 Google 프로젝트가 접근 차단된 상태입니다. **모델을 바꿔도 해결되지 않습니다.**
+2026년 7월 확인 결과, 현재 키는 이런 상태였습니다:
+
+```
+gemini-2.0-flash-lite  429  limit: 0            (무료등급 할당량 0)
+gemini-2.5-flash       403  PERMISSION_DENIED: Your project has been denied access.
+```
+
+교육청·회사 등 조직 Google 계정으로 발급한 키는 관리자 정책에 막히는 경우가 많습니다.
+**개인 Google 계정**으로 https://aistudio.google.com/app/apikey 에서 키를 새로 발급해
+`GEMINI_API_KEY` 를 교체하고, Vercel 환경변수도 함께 바꾸세요.
+
+영향 범위는 **버튼 2개뿐**입니다 — 평가 만들기의 AI 항목 추천, 생활기록부의 초안 생성.
+둘 다 실패해도 오류 토스트만 뜨고 화면은 정상 동작합니다. 나머지 기능은 Gemini 없이 전부 됩니다.
 
 **쪽지 실시간 알림이 안 온다**
 Supabase **Database → Replication** 에서 `messages` 테이블이 켜져 있는지 확인하세요.
