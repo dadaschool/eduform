@@ -115,7 +115,7 @@ assignment_submissions, observations, student_record_drafts, messages`
 
 **Authentication → Sign In / Providers → Email** 에서 **Confirm email** 을 **끕니다**.
 
-## 5단계 — API 키 4개 확보
+## 5단계 — API 키 확보
 
 **Project Settings → API** 에서 세 개를 복사합니다.
 
@@ -125,17 +125,22 @@ assignment_submissions, observations, student_record_drafts, messages`
 | Project API keys → `anon` `public` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
 | Project API keys → `service_role` | `SUPABASE_SERVICE_ROLE_KEY` |
 
-네 번째는 Google에서 받습니다.
+AI 기능용 키는 아래에서 받습니다. **둘 다 없어도 나머지 기능은 전부 동작합니다.**
 
 | 발급처 | 넣을 환경변수 이름 |
 |---|---|
 | https://aistudio.google.com/app/apikey → Create API key | `GEMINI_API_KEY` |
+| https://console.upstage.ai → API Keys | `UPSTAGE_API_KEY` |
+
+AI 기능은 **Gemini 를 먼저 쓰고 실패하면 업스테이지(Solar)로 자동 전환**됩니다.
+둘 중 하나만 있어도 동작합니다. Gemini 가 막혀 있다면 `AI_PRIMARY=upstage` 를 함께
+등록해 Gemini 호출을 건너뛰게 하세요.
 
 > `service_role` 키는 보안 규칙(RLS)을 무시하는 관리자 키입니다. **깃, 채팅, 문서에 절대 붙여넣지 마세요.** 서버에서만 쓰이고 브라우저로는 나가지 않습니다.
 
 ## 6단계 — 로컬에서 먼저 확인
 
-프로젝트 폴더의 `.env.local` 을 열어 4개 값을 새 것으로 바꿉니다.
+프로젝트 폴더의 `.env.local` 을 열어 값을 새 것으로 바꿉니다.
 (`.env.example` 이 어떤 형식인지 보여주는 템플릿입니다)
 
 ```bash
@@ -170,13 +175,16 @@ values (
 
 1. https://vercel.com/dashboard → **eduform** 프로젝트
 2. **Settings → Environment Variables**
-3. 4개를 하나씩 추가합니다. **Environment는 Production, Preview, Development 모두 체크**하세요.
+3. 아래 값들을 하나씩 추가합니다. **Environment는 Production, Preview, Development 모두 체크**하세요.
+   Supabase 3개는 필수입니다. AI 키는 쓰는 쪽만 넣으면 됩니다.
 
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
 GEMINI_API_KEY
+UPSTAGE_API_KEY
+AI_PRIMARY
 ```
 
 4. **Deployments** 탭 → 맨 위 배포의 `⋯` → **Redeploy**
@@ -193,7 +201,8 @@ GEMINI_API_KEY
 - [ ] **평가 → 1학기 국어 수행평가 → 체크**에서 상/중/하, 1~5점, 완료/보류/미제출, 텍스트가 모두 정상 표시된다
 - [ ] **과제 → 독서록 쓰기**에서 강도윤의 제출물과 내가 남긴 피드백이 보인다
 - [ ] **관찰기록**에 9건이 보인다
-- [ ] **생활기록부**에서 강도윤 초안을 새로 생성해 본다 ← Gemini 키가 여기서 검증됩니다
+- [ ] **생활기록부**에서 강도윤 초안을 새로 생성해 본다 ← AI 키가 여기서 검증됩니다
+      (토스트 설명줄에 `업스테이지 Solar` 또는 `Google Gemini` 중 어느 쪽이 응답했는지 표시됩니다)
 - [ ] **쪽지함**에 6통이 있고, 정우진의 "결석 보충 질문"이 안읽음으로 표시된다
 
 **학생으로 로그인** (시크릿 창) — `/student-login` → `s02@eduform.test` / `edu1234`
@@ -251,9 +260,15 @@ npm run build
 교사 화면은 `profiles.teacher_id` 기준으로 학생을 찾습니다. 초대코드로 가입하면 이 값이 자동으로 채워집니다.
 Supabase에서 직접 학생 행을 만들었다면 `teacher_id` 를 교사 UID로 채워주세요.
 
-**AI 초안 생성만 실패한다 (`PERMISSION_DENIED` 또는 `limit: 0`)**
-Gemini API 키가 속한 Google 프로젝트가 접근 차단된 상태입니다. **모델을 바꿔도 해결되지 않습니다.**
-2026년 7월 확인 결과, 현재 키는 이런 상태였습니다:
+**AI 초안 생성이 실패한다**
+
+AI 기능은 **Gemini → 업스테이지(Solar) 순으로 자동 전환**됩니다([`src/lib/ai.ts`](src/lib/ai.ts)).
+둘 중 하나만 설정되어 있어도 동작하고, 생성 성공 시 어느 쪽이 응답했는지 토스트에 표시됩니다.
+
+둘 다 실패하면 오류 메시지에 양쪽 이유가 함께 담깁니다. 서버 로그에는 `[ai]` 접두사로 남습니다.
+
+`PERMISSION_DENIED` 또는 `limit: 0` 이 Gemini 쪽에 보이면, 그 키가 속한 Google 프로젝트가
+차단된 상태입니다. **모델을 바꿔도 해결되지 않습니다.** 2026년 7월 확인 결과:
 
 ```
 gemini-2.0-flash-lite  429  limit: 0            (무료등급 할당량 0)
@@ -261,11 +276,14 @@ gemini-2.5-flash       403  PERMISSION_DENIED: Your project has been denied acce
 ```
 
 교육청·회사 등 조직 Google 계정으로 발급한 키는 관리자 정책에 막히는 경우가 많습니다.
-**개인 Google 계정**으로 https://aistudio.google.com/app/apikey 에서 키를 새로 발급해
-`GEMINI_API_KEY` 를 교체하고, Vercel 환경변수도 함께 바꾸세요.
+해결 방법은 둘 중 하나입니다.
 
-영향 범위는 **버튼 2개뿐**입니다 — 평가 만들기의 AI 항목 추천, 생활기록부의 초안 생성.
-둘 다 실패해도 오류 토스트만 뜨고 화면은 정상 동작합니다. 나머지 기능은 Gemini 없이 전부 됩니다.
+1. **업스테이지만 쓴다** — `UPSTAGE_API_KEY` 를 등록하고 `AI_PRIMARY=upstage` 로 둡니다.
+   Gemini 호출을 건너뛰어 응답이 약 0.7초 빨라집니다. (현재 이 설정을 쓰고 있습니다)
+2. **개인 Google 계정으로 Gemini 키 재발급** — https://aistudio.google.com/app/apikey
+
+어느 쪽도 없으면 영향 범위는 **버튼 2개뿐**입니다 — 평가 만들기의 AI 항목 추천,
+생활기록부의 초안 생성. 화면은 정상 동작하고 나머지 기능은 전부 됩니다.
 
 **쪽지 실시간 알림이 안 온다**
 Supabase **Database → Replication** 에서 `messages` 테이블이 켜져 있는지 확인하세요.
