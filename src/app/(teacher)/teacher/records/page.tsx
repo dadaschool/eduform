@@ -56,7 +56,9 @@ export default function RecordsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setEditedDraft(data.draft)
-      toast.success('학생부 초안이 생성되었습니다.')
+      toast.success('학생부 초안이 생성되었습니다.', {
+        description: data.provider === 'upstage' ? '업스테이지 Solar' : 'Google Gemini',
+      })
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : '생성 실패')
     } finally {

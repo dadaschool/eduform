@@ -1,6 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { generateText } from '@/lib/ai'
 
 export async function POST(req: Request) {
   try {
@@ -49,9 +49,6 @@ export async function POST(req: Request) {
       `• [${o.observed_at}${o.subject ? ` ${o.subject}` : ''}] ${o.content}`
     ).join('\n')
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
-
     const prompt = `당신은 중학교 교사의 학교생활기록부(학생부) 세부능력 및 특기사항(세특) 작성을 돕는 전문가입니다.
 
 다음 원칙을 반드시 지켜주세요:
@@ -77,10 +74,9 @@ ${observationsText || '(데이터 없음)'}
 
 위 자료를 바탕으로 학생부 세특 초안을 작성해 주세요. 교사가 검토·수정할 수 있는 초안 형태로 작성하고, 세특 문장만 출력하세요.`
 
-    const result = await model.generateContent(prompt)
-    const draft = result.response.text().trim()
+    const { text: draft, provider } = await generateText({ user: prompt })
 
-    return NextResponse.json({ draft })
+    return NextResponse.json({ draft, provider })
   } catch (err: unknown) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'AI 생성 실패' }, { status: 500 })
   }

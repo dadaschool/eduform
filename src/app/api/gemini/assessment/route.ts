@@ -1,6 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { generateText } from '@/lib/ai'
 
 export async function POST(req: Request) {
   try {
@@ -9,8 +9,6 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
     const { prompt, subject, title } = await req.json()
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
 
     const systemPrompt = `당신은 중학교 교사를 돕는 평가 설계 전문가입니다. 2022 개정 교육과정 기반으로 수행평가 루브릭을 설계합니다.
 
@@ -31,11 +29,10 @@ export async function POST(req: Request) {
 반드시 JSON만 응답하세요. 코드블록 없이 순수 JSON 배열만:
 [{"name":"...","description":"...","check_type":"...","number_min":0,"number_max":100}]`
 
-    const result = await model.generateContent([
-      { text: systemPrompt },
-      { text: `교과: ${subject || '미지정'}\n평가명: ${title || '미지정'}\n\n교사 요청: ${prompt}` }
-    ])
-    const text = result.response.text().trim()
+    const { text, provider } = await generateText({
+      system: systemPrompt,
+      user: `교과: ${subject || '미지정'}\n평가명: ${title || '미지정'}\n\n교사 요청: ${prompt}`,
+    })
 
     // JSON 파싱
     let items
@@ -48,7 +45,7 @@ export async function POST(req: Request) {
       else throw new Error('JSON 파싱 실패')
     }
 
-    return NextResponse.json({ items })
+    return NextResponse.json({ items, provider })
   } catch (err: unknown) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'AI 생성 실패' }, { status: 500 })
   }

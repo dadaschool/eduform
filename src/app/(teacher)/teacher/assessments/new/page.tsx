@@ -93,7 +93,9 @@ export default function NewAssessmentPage() {
           number_max: it.number_max ?? 100,
         }))
         setItems(prev => [...prev, ...newItems])
-        toast.success(`AI가 ${newItems.length}개의 평가 항목을 생성했습니다.`)
+        toast.success(`AI가 ${newItems.length}개의 평가 항목을 생성했습니다.`, {
+          description: data.provider === 'upstage' ? '업스테이지 Solar' : 'Google Gemini',
+        })
       }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'AI 생성 실패')
