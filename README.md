@@ -30,80 +30,143 @@
 
 ## 내 계정에 설치하기
 
-### 0단계 — 내 저장소로 복사
+두 가지 길이 있습니다. **터미널을 안 쓰셔도 됩니다.**
+
+| | 경로 A — 클릭만 | 경로 B — 로컬 개발까지 |
+|---|---|---|
+| 필요한 것 | 웹브라우저 | 브라우저 + Node.js 20+ |
+| 걸리는 시간 | 약 10분 | 약 20분 |
+| 코드 수정 | 못 함 | 가능 |
+
+---
+
+## 경로 A — 클릭만으로 설치
+
+### A-1. 내 저장소로 복사
 
 이 저장소 오른쪽 위 **`Use this template`** → **`Create a new repository`**
-(버튼이 없으면 **Fork** 하세요)
+(버튼이 없으면 **Fork**)
 
-### 1단계 — Supabase 프로젝트 만들기
+### A-2. Supabase 프로젝트 만들기
 
 1. https://supabase.com/dashboard → **New project**
-2. **Region** 은 `Northeast Asia (Seoul)` 을 고르세요 (한국에서 가장 빠릅니다)
-3. **Database Password 는 어딘가에 저장하세요.** 앱 동작에는 필요 없지만,
-   아래 3단계의 자동 설치를 쓰려면 필요합니다.
+2. **Region** 은 `Northeast Asia (Seoul)` (한국에서 가장 빠릅니다)
+3. 생성까지 2~3분
 
 > ⚠️ 무료 등급은 **약 1주간 요청이 없으면 자동 일시정지**됩니다. 그러면 접속이 안 되고,
-> 대시보드에서 `Resume project` 를 눌러야 다시 살아납니다. 데이터는 보존됩니다.
+> 대시보드에서 `Resume project` 를 눌러야 살아납니다. 데이터는 보존됩니다.
 
-### 2단계 — 키 채우기
+### A-3. 데이터베이스 만들기 ← 배포보다 먼저 해야 합니다
 
-`.env.example` 을 복사해 `.env.local` 을 만들고 값을 넣으세요.
+1. Supabase → 왼쪽 **SQL Editor** → **New query**
+2. [`supabase/schema.sql`](supabase/schema.sql) **전체**를 붙여넣고 **Run**
+   → `Success. No rows returned` 이면 성공
+3. 눌러볼 시범 데이터를 원하면 [`supabase/seed.sql`](supabase/seed.sql) 로 한 번 더
 
-```bash
-cp .env.example .env.local
-```
+두 파일 모두 **여러 번 실행해도 안전합니다.** 정책·트리거만 교체하고 데이터는 지우지 않습니다.
 
-| 변수 | 어디서 얻나 | 필수 |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API → Project URL | ✅ |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 같은 화면 → `anon` / `publishable` | ✅ |
-| `SUPABASE_SERVICE_ROLE_KEY` | 같은 화면 → `service_role` / `secret` | ✅ |
-| `UPSTAGE_API_KEY` | https://console.upstage.ai | AI 기능용 |
-| `GEMINI_API_KEY` | https://aistudio.google.com/app/apikey | AI 기능용 |
-| `SUPABASE_DB_URL` | Project Settings → Database → Connection string (URI) | 3단계 자동설치용 |
-
-AI 키는 **둘 중 하나만 있어도** 동작합니다. Gemini 를 먼저 쓰고 실패하면 업스테이지로
-자동 전환됩니다. Gemini 가 막혀 있다면 `AI_PRIMARY=upstage` 를 넣어 건너뛰게 하세요.
-
-> `service_role` 키는 보안 규칙(RLS)을 무시하는 관리자 키입니다. 서버에서만 쓰이고
-> 브라우저로 나가지 않습니다. **깃·채팅·문서에 붙여넣지 마세요.**
-
-### 3단계 — 데이터베이스 만들기
-
-**방법 A — 명령 한 줄** (`SUPABASE_DB_URL` 을 넣었다면)
-
-```bash
-npm install
-npm run db:seed
-```
-
-테이블 15개 + 보안정책 + 함수 + 실시간 설정 + 시범 데이터까지 한 번에 올라갑니다.
-시범 데이터 없이 빈 상태로 시작하려면 `npm run db:setup` 을 쓰세요.
-
-**방법 B — 대시보드에 붙여넣기** (터미널을 안 쓰거나 DB 비밀번호를 모를 때)
-
-1. Supabase → **SQL Editor** → **New query**
-2. [`supabase/schema.sql`](supabase/schema.sql) 전체를 붙여넣고 **Run**
-3. 시범 데이터를 원하면 [`supabase/seed.sql`](supabase/seed.sql) 로 한 번 더
-
-두 파일 모두 **여러 번 실행해도 안전합니다.** 기존 정책·트리거를 교체하되 데이터는 지우지 않습니다.
-
-### 4단계 — 이메일 확인 끄기
+### A-4. 이메일 확인 끄기
 
 학생이 초대코드로 가입할 때 이메일 인증을 요구하면 학교 환경에서 막힙니다.
 
-Supabase → **Authentication → Sign In / Providers → Email** → **Confirm email** 끄기
+**Authentication → Sign In / Providers → Email** → **Confirm email** 끄기
 
-### 5단계 — 점검
+### A-5. 키 3개 복사
+
+**Project Settings → API**
+
+| 화면의 이름 | 환경변수 |
+|---|---|
+| Project URL | `NEXT_PUBLIC_SUPABASE_URL` |
+| `anon` / `publishable` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+| `service_role` / `secret` | `SUPABASE_SERVICE_ROLE_KEY` |
+
+> `service_role` 은 보안 규칙(RLS)을 무시하는 관리자 키입니다. 서버에서만 쓰이고
+> 브라우저로 나가지 않습니다. **깃·채팅·문서에 붙여넣지 마세요.**
+
+### A-6. 배포
+
+[![Vercel로 배포](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgjdadat%2Feduform&project-name=eduform&repository-name=eduform&env=NEXT_PUBLIC_SUPABASE_URL%2CNEXT_PUBLIC_SUPABASE_ANON_KEY%2CSUPABASE_SERVICE_ROLE_KEY&envDescription=Supabase+%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%EC%9D%98+%EC%A3%BC%EC%86%8C%EC%99%80+API+%ED%82%A4+3%EA%B0%9C+%28Project+Settings+%3E+API+%EC%97%90%EC%84%9C+%EB%B3%B5%EC%82%AC%29&envLink=https%3A%2F%2Fgithub.com%2Fgjdadat%2Feduform%2Fblob%2Fmain%2FREADME.md)
+
+버튼을 누르면 저장소가 복제되고 **A-5 의 키 3개를 입력받는 화면**이 나옵니다.
+붙여넣고 **Deploy** 를 누르면 끝입니다.
+
+> 위 버튼은 **이 원본 저장소**를 복제합니다. A-1 에서 만든 내 저장소로 배포하려면
+> 대신 https://vercel.com/new 에서 내 저장소를 선택하세요.
+
+배포가 끝나면 확인할 것 두 가지:
+
+- **Framework Preset 이 `Next.js` 인지** — `Other` 면 빌드는 성공하는데 **모든 주소가 404** 가 됩니다.
+  Settings → Build and Deployment 에서 확인하고, 고쳤으면 **꼭 Redeploy** 하세요.
+- **접속했을 때 `Login – Vercel` 이 나오면** — Settings → Deployment Protection →
+  **Vercel Authentication** 을 끄세요. 켜져 있으면 교사·학생이 로그인 화면에조차 못 갑니다.
+
+### A-7. AI 기능 켜기 (선택)
+
+AI 초안 생성을 쓰려면 키를 하나 더 넣습니다. **둘 중 하나만 있어도 됩니다.**
+
+| 변수 | 발급처 |
+|---|---|
+| `UPSTAGE_API_KEY` | https://console.upstage.ai |
+| `GEMINI_API_KEY` | https://aistudio.google.com/app/apikey |
+
+Vercel → **Settings → Environment Variables** 에 추가한 뒤
+**Deployments → `⋯` → Redeploy** 하세요. 환경변수는 새 배포에만 반영됩니다.
+
+Gemini 를 먼저 쓰고 실패하면 업스테이지로 자동 전환됩니다. Gemini 가 막혀 있다면
+`AI_PRIMARY` 를 `upstage` 로 넣어 헛된 호출을 건너뛰게 하세요.
+
+**여기까지 하면 끝입니다.** 아래 [교사 계정 만들기](#교사-계정-만들기)로 넘어가세요.
+
+---
+
+## 경로 B — 로컬에서 개발까지
+
+경로 A 의 **A-1 ~ A-5** 를 먼저 하고 (A-3 은 아래 방법으로 대신할 수 있습니다), 이어서:
+
+### B-1. 키 채우기
+
+```bash
+cp .env.example .env.local
+npm install
+```
+
+`.env.local` 을 열어 값을 넣습니다.
+
+| 변수 | 필수 |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ |
+| `UPSTAGE_API_KEY` 또는 `GEMINI_API_KEY` | AI 기능용 |
+| `SUPABASE_DB_URL` | 아래 B-2 자동설치용 |
+
+### B-2. 데이터베이스 자동 구축
+
+`.env.local` 에 `SUPABASE_DB_URL` 을 넣으면 명령 하나로 끝납니다.
+
+```bash
+npm run db:seed      # 스키마 + 시범 데이터
+npm run db:setup     # 스키마만 (빈 상태로 시작)
+```
+
+연결 문자열은 Supabase → **Project Settings → Database → Connection string → URI**
+에서 복사하고, `[YOUR-PASSWORD]` 를 실제 DB 비밀번호로 바꿉니다.
+모르면 같은 화면의 **Reset database password** 로 새로 정할 수 있습니다.
+
+이 값이 없으면 명령이 실행 대신 **대시보드에 붙여넣는 방법을 안내**합니다.
+즉 A-3 을 이미 했다면 이 단계는 건너뛰어도 됩니다.
+
+### B-3. 점검
 
 ```bash
 npm run doctor
 ```
 
-환경변수, Supabase 연결, 테이블·함수, 보안정책, 계정, AI 키를 한 번에 확인하고
-빠진 것과 해야 할 일을 알려줍니다. 비밀값은 출력하지 않습니다.
+환경변수 · Supabase 연결 · 테이블 15개 · 함수 6개 · 보안정책 · 계정 · AI 키를
+차례로 확인하고, 빠진 것과 해야 할 일을 알려줍니다. 비밀값은 출력하지 않습니다.
 
-### 6단계 — 실행
+### B-4. 실행
 
 ```bash
 npm run dev
@@ -111,27 +174,17 @@ npm run dev
 
 http://localhost:3000 → 교사 로그인 화면
 
-**시범 데이터를 넣었다면** `teacher@eduform.test` / `edu1234` 로 바로 들어갈 수 있습니다.
-학생 계정은 `s01@eduform.test` ~ `s08@eduform.test`, 비밀번호는 같습니다.
+시범 데이터를 넣었다면 `teacher@eduform.test` / `edu1234` 로 바로 들어갈 수 있습니다.
+학생은 `s01@eduform.test` ~ `s08@eduform.test`, 비밀번호는 같습니다.
 
 > ⚠️ 시범 계정은 비밀번호가 전부 같습니다. **실제 학생을 받기 전에 지우세요.**
 > `supabase/seed.sql` 맨 아래 주석 처리된 `delete` 블록을 실행하면 샘플만 삭제됩니다.
 
-### 7단계 — 배포 (Vercel)
+### B-5. 배포
 
-1. https://vercel.com/new → 내 저장소 선택
-2. **Framework Preset 이 `Next.js` 인지 확인하세요.**
-   `Other` 로 두면 빌드는 성공하는데 **모든 주소가 404** 가 됩니다.
-3. **Environment Variables** 에 2단계의 값을 넣습니다
-   (`SUPABASE_DB_URL` 은 넣지 않아도 됩니다 — 로컬 설치용입니다)
-4. **Deploy**
-
-배포 후 접속했을 때 `Login – Vercel` 페이지가 나오면,
-**Settings → Deployment Protection → Vercel Authentication** 을 끄세요.
-켜져 있으면 교사·학생이 로그인 화면에조차 접근할 수 없습니다.
-
----
-
+https://vercel.com/new → 내 저장소 선택 → 환경변수 입력 → Deploy.
+`SUPABASE_DB_URL` 은 넣지 않아도 됩니다 (로컬 설치용).
+배포 후 확인할 것은 **A-6 의 두 가지**와 같습니다.
 ## 교사 계정 만들기
 
 앱에 교사 회원가입 화면은 없습니다 (`/register` 는 학생 전용). 직접 만듭니다.
