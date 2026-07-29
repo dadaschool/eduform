@@ -23,7 +23,6 @@ export default function RecordsPage() {
   const [filterClass, setFilterClass] = useState('all')
   const [search, setSearch] = useState('')
   const [subject, setSubject] = useState('')
-  const [generatedDraft, setGeneratedDraft] = useState('')
   const [editedDraft, setEditedDraft] = useState('')
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -56,7 +55,6 @@ export default function RecordsPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setGeneratedDraft(data.draft)
       setEditedDraft(data.draft)
       toast.success('학생부 초안이 생성되었습니다.')
     } catch (err: unknown) {
@@ -136,7 +134,7 @@ export default function RecordsPage() {
               filteredStudents.length === 0 ? <p className="text-sm text-gray-400">학생이 없습니다</p> :
               filteredStudents.map(s => (
                 <button key={s.id} type="button"
-                  onClick={() => { setSelectedStudent(s); setGeneratedDraft(''); setEditedDraft('') }}
+                  onClick={() => { setSelectedStudent(s); setEditedDraft('') }}
                   className={`w-full flex items-center gap-2 p-2.5 rounded-lg text-left transition-colors ${
                     selectedStudent?.id === s.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-50 text-gray-700'
                   }`}>

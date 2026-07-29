@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 import { Plus, Search, Trash2, ClipboardList, Users } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
-import { CHECK_TYPE_LABELS } from '@/lib/types'
 import type { Assessment, Class } from '@/lib/types'
 
 interface AssessmentWithStats extends Assessment {

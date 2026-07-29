@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 import { Plus, Upload, Download, Search, Trash2, Key, Users, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
-import type { Profile, Class, Badge as BadgeType, StudentBadge } from '@/lib/types'
+import type { Profile, Class, Badge as BadgeType } from '@/lib/types'
 import * as XLSX from 'xlsx'
 
 interface StudentRow extends Profile {

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, BookOpen, ClipboardList, Eye, School, Award } from 'lucide-react'
+import { Users, BookOpen, ClipboardList, Eye, School } from 'lucide-react'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 

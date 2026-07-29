@@ -58,13 +58,6 @@ export default function AssignmentsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // 이 반에 배정된 과제 id 목록
-      const { data: acRows } = await supabase
-        .from('assignment_classes')
-        .select('assignment_id')
-
-      const assignedIds = new Set((acRows ?? []).map(r => r.assignment_id))
-
       // 학생 목록
       const { data: studs } = await supabase
         .from('profiles')

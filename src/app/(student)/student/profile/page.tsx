@@ -15,7 +15,6 @@ export default function StudentProfilePage() {
   const [email, setEmail] = useState('')
   const [className, setClassName] = useState('')
   const [studentNumber, setStudentNumber] = useState('')
-  const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
   const [changingPw, setChangingPw] = useState(false)
@@ -49,7 +48,7 @@ export default function StudentProfilePage() {
       const { error } = await supabase.auth.updateUser({ password: newPw })
       if (error) throw error
       toast.success('비밀번호가 변경되었습니다.')
-      setCurrentPw(''); setNewPw(''); setConfirmPw('')
+      setNewPw(''); setConfirmPw('')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : '변경 실패')
     } finally {
