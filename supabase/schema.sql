@@ -186,6 +186,28 @@ create table if not exists student_record_drafts (
 );
 
 -- =============================================
+-- 쪽지 (Messages)
+-- =============================================
+-- sender_id / receiver_id 는 반드시 profiles 를 참조해야 한다.
+-- 코드가 profiles!sender_id 형태로 보낸 사람 이름을 함께 조회하기 때문에,
+-- auth.users 를 참조하면 그 조회가 실패한다.
+create table if not exists messages (
+  id uuid primary key default uuid_generate_v4(),
+  sender_id uuid not null references profiles(id) on delete cascade,
+  receiver_id uuid not null references profiles(id) on delete cascade,
+  subject text,
+  content text not null,
+  reply_to_id uuid references messages(id) on delete set null,
+  is_read boolean not null default false,
+  deleted_by_sender boolean not null default false,
+  deleted_by_receiver boolean not null default false,
+  created_at timestamptz default now()
+);
+
+create index if not exists messages_receiver_idx on messages(receiver_id, created_at desc);
+create index if not exists messages_sender_idx on messages(sender_id, created_at desc);
+
+-- =============================================
 -- RLS 정책
 -- =============================================
 alter table classes enable row level security;
@@ -202,6 +224,7 @@ alter table assignment_classes enable row level security;
 alter table assignment_submissions enable row level security;
 alter table observations enable row level security;
 alter table student_record_drafts enable row level security;
+alter table messages enable row level security;
 
 -- profiles: 본인 조회/수정, 교사는 자신이 담당한 학생 조회
 create policy "profiles_select" on profiles for select using (
@@ -278,6 +301,16 @@ create policy "observations_student_select" on observations for select using (au
 create policy "drafts_teacher" on student_record_drafts for all using (auth.uid() = teacher_id);
 create policy "drafts_student_select" on student_record_drafts for select using (auth.uid() = student_id);
 
+-- messages: 내가 보낸 쪽지 또는 내가 받은 쪽지만 보인다
+create policy "messages_select" on messages for select using (
+  auth.uid() = sender_id or auth.uid() = receiver_id
+);
+create policy "messages_insert" on messages for insert with check (auth.uid() = sender_id);
+-- is_read, deleted_by_sender, deleted_by_receiver 갱신용 (당사자만)
+create policy "messages_update" on messages for update using (
+  auth.uid() = sender_id or auth.uid() = receiver_id
+);
+
 -- =============================================
 -- 트리거: profiles updated_at 자동 갱신
 -- =============================================
@@ -299,3 +332,35 @@ create trigger observations_updated_at before update on observations
   for each row execute function update_updated_at();
 create trigger drafts_updated_at before update on student_record_drafts
   for each row execute function update_updated_at();
+
+-- =============================================
+-- RPC: 초대코드 사용 횟수 증가
+-- =============================================
+create or replace function increment_invite_code(code text)
+returns void as $$
+begin
+  update invite_codes
+  set used_count = used_count + 1
+  where invite_codes.code = $1;
+end;
+$$ language plpgsql security definer;
+
+-- =============================================
+-- Realtime: 학생 화면의 새 쪽지 알림
+-- =============================================
+-- MessageNotifier 가 messages 테이블의 INSERT 를 실시간 구독한다.
+-- 이 publication 에 등록되지 않으면 알림 토스트가 뜨지 않는다.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'messages'
+  ) then
+    alter publication supabase_realtime add table messages;
+  end if;
+exception
+  when undefined_object then
+    raise notice 'supabase_realtime publication 이 없습니다. 대시보드 > Database > Replication 에서 messages 를 켜주세요.';
+end $$;

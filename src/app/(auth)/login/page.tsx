@@ -13,7 +13,6 @@ import { BookOpen, GraduationCap } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
-  const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -22,6 +21,9 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     try {
+      // 렌더 시점이 아니라 실제 로그인 시점에 클라이언트를 만든다.
+      // 이 페이지는 빌드 때 정적 생성되므로, 본문에서 만들면 환경변수 없이 빌드가 깨진다.
+      const supabase = createClient()
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       const { data: { user } } = await supabase.auth.getUser()

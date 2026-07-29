@@ -13,10 +13,9 @@ import { GraduationCap } from 'lucide-react'
 
 export default function RegisterPage() {
   const router = useRouter()
-  const supabase = createClient()
   const [step, setStep] = useState<'code' | 'info'>('code')
   const [inviteCode, setInviteCode] = useState('')
-  const [classInfo, setClassInfo] = useState<{ id: string; name: string } | null>(null)
+  const [classInfo, setClassInfo] = useState<{ id: string; name: string; teacherId: string } | null>(null)
   const [name, setName] = useState('')
   const [studentNumber, setStudentNumber] = useState('')
   const [email, setEmail] = useState('')
@@ -27,9 +26,12 @@ export default function RegisterPage() {
     e.preventDefault()
     setLoading(true)
     try {
+      // 렌더 시점이 아니라 실제 조회 시점에 클라이언트를 만든다.
+      // 이 페이지는 빌드 때 정적 생성되므로, 본문에서 만들면 환경변수 없이 빌드가 깨진다.
+      const supabase = createClient()
       const { data, error } = await supabase
         .from('invite_codes')
-        .select('id, class_id, is_active, expires_at, max_uses, used_count, classes(name)')
+        .select('id, class_id, teacher_id, is_active, expires_at, max_uses, used_count, classes(name)')
         .eq('code', inviteCode.toUpperCase().trim())
         .single()
       if (error || !data) throw new Error('유효하지 않은 초대코드입니다.')
@@ -37,7 +39,7 @@ export default function RegisterPage() {
       if (data.expires_at && new Date(data.expires_at) < new Date()) throw new Error('만료된 초대코드입니다.')
       if (data.used_count >= data.max_uses) throw new Error('초대코드 사용 한도에 도달했습니다.')
       const cls = data.classes as unknown as { name: string }
-      setClassInfo({ id: data.class_id, name: cls.name })
+      setClassInfo({ id: data.class_id, name: cls.name, teacherId: data.teacher_id })
       setStep('info')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : '코드 확인에 실패했습니다.')
@@ -51,16 +53,20 @@ export default function RegisterPage() {
     if (!classInfo) return
     setLoading(true)
     try {
+      const supabase = createClient()
       const { data: authData, error: authError } = await supabase.auth.signUp({ email, password })
       if (authError) throw authError
       if (!authData.user) throw new Error('회원가입 실패')
 
+      // teacher_id 는 초대코드에서 가져온다. 이 값이 없으면 교사 화면의
+      // 학생 목록(teacher_id 기준 조회)에 이 학생이 나타나지 않는다.
       const { error: profileError } = await supabase.from('profiles').insert({
         id: authData.user.id,
         email,
         name,
         role: 'student',
         class_id: classInfo.id,
+        teacher_id: classInfo.teacherId,
         student_number: studentNumber || null,
       })
       if (profileError) throw profileError
