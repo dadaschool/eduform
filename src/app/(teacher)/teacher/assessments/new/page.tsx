@@ -205,14 +205,14 @@ export default function NewAssessmentPage() {
           </CardContent>
         </Card>
 
-        {/* Gemini AI 평가 항목 생성 */}
+        {/* AI 평가 항목 생성 */}
         <Card className="border-purple-200 bg-purple-50/50">
           <CardHeader className="pb-3">
             <button type="button" className="flex items-center justify-between w-full"
               onClick={() => setShowAI(!showAI)}>
               <CardTitle className="text-base flex items-center gap-2 text-purple-700">
                 <Sparkles className="w-4 h-4" />
-                AI로 평가 항목 초안 생성 (Gemini)
+                AI로 평가 항목 초안 생성
               </CardTitle>
               {showAI ? <ChevronUp className="w-4 h-4 text-purple-500" /> : <ChevronDown className="w-4 h-4 text-purple-500" />}
             </button>

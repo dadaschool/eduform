@@ -190,7 +190,7 @@ export default function RecordsPage() {
                     disabled={generating}
                   >
                     <Sparkles className="w-4 h-4" />
-                    {generating ? 'AI 생성 중...' : 'Gemini로 세특 초안 생성'}
+                    {generating ? 'AI 생성 중...' : 'AI로 세특 초안 생성'}
                   </Button>
                   <p className="text-xs text-gray-400 text-center">
                     평가 체크, 과제 제출 현황, 관찰일지를 종합해 생성합니다
