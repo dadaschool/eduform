@@ -11,10 +11,11 @@ import { ChevronLeft, Send, Clock, MessageSquare, CheckCircle } from 'lucide-rea
 import Link from 'next/link'
 import { formatDateTime, getSubmissionStatus, SUBMISSION_STATUS_LABELS, SUBMISSION_STATUS_COLORS } from '@/lib/utils'
 import type { Assignment, AssignmentSubmission } from '@/lib/types'
-import { use } from 'react'
+import { useParams } from 'next/navigation'
 
-export default function StudentAssignmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function StudentAssignmentDetailPage() {
+  const params = useParams()
+  const id = params.id as string
   const supabase = createClient()
   const [assignment, setAssignment] = useState<Assignment | null>(null)
   const [submission, setSubmission] = useState<AssignmentSubmission | null>(null)

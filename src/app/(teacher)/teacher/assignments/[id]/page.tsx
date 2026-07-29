@@ -11,7 +11,7 @@ import { ChevronLeft, Clock, Save } from 'lucide-react'
 import Link from 'next/link'
 import { formatDateTime, getSubmissionStatus, SUBMISSION_STATUS_LABELS, SUBMISSION_STATUS_COLORS } from '@/lib/utils'
 import type { Assignment, Class, Profile, AssignmentSubmission } from '@/lib/types'
-import { use } from 'react'
+import { useParams } from 'next/navigation'
 
 interface StudentRow {
   student: Profile
@@ -19,8 +19,9 @@ interface StudentRow {
   status: 'submitted' | 'late' | 'pre'
 }
 
-export default function AssignmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function AssignmentDetailPage() {
+  const params = useParams()
+  const id = params.id as string
   const supabase = createClient()
   const [assignment, setAssignment] = useState<Assignment | null>(null)
   const [classes, setClasses] = useState<Class[]>([])

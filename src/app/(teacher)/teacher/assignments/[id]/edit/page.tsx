@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,10 +12,10 @@ import { toast } from 'sonner'
 import { ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 import type { Class } from '@/lib/types'
-import { use } from 'react'
 
-export default function EditAssignmentPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function EditAssignmentPage() {
+  const params = useParams()
+  const id = params.id as string
   const router = useRouter()
   const supabase = createClient()
   const [classes, setClasses] = useState<Class[]>([])

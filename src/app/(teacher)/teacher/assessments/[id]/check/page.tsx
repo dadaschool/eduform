@@ -10,7 +10,7 @@ import { Save, Search, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { Assessment, AssessmentItem, Class, Profile } from '@/lib/types'
-import { use } from 'react'
+import { useParams } from 'next/navigation'
 
 // 셀 안에서 쓰는 compact 컨트롤
 function CompactCell({ item, value, onChange }: { item: AssessmentItem; value: string | null; onChange: (v: string) => void }) {
@@ -97,8 +97,9 @@ function CompactCell({ item, value, onChange }: { item: AssessmentItem; value: s
   )
 }
 
-export default function CheckPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function CheckPage() {
+  const params = useParams()
+  const id = params.id as string
   const supabase = createClient()
   const [assessment, setAssessment] = useState<Assessment | null>(null)
   const [items, setItems] = useState<AssessmentItem[]>([])

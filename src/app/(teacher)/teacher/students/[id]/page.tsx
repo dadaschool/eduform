@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChevronLeft, BookOpen, ClipboardList, Eye, Award, MessageCircle } from 'lucide-react'
 import Link from 'next/link'
-import { use } from 'react'
+import { useParams } from 'next/navigation'
 import { formatDate, formatDateTime, getSubmissionStatus, SUBMISSION_STATUS_LABELS, SUBMISSION_STATUS_COLORS } from '@/lib/utils'
 import type { Profile, Class, Badge as BadgeType, StudentBadge, Assignment, AssignmentSubmission, Assessment, AssessmentItem, StudentAssessmentCheck, Observation } from '@/lib/types'
 
@@ -22,8 +22,9 @@ interface AssessmentRow {
   checks: StudentAssessmentCheck[]
 }
 
-export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function StudentDetailPage() {
+  const params = useParams()
+  const id = params.id as string
   const supabase = createClient()
 
   const [student, setStudent] = useState<Profile | null>(null)
