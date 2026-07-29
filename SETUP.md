@@ -2,6 +2,11 @@
 
 이 문서 순서대로 따라가면 배포가 완료됩니다. 예상 소요 20~30분.
 
+> **Vercel 프로젝트를 새로 만들 때 반드시 확인할 것**
+> **Framework Preset 을 `Next.js` 로** 설정하세요. `Other` 로 두면 빌드는 성공하는데
+> 모든 주소가 404 가 됩니다. 처음 배포 때 이 문제로 오래 헤맸습니다.
+> 자세한 내용은 맨 아래 [막혔을 때](#막혔을-때) 참고.
+
 ---
 
 ## 왜 지금 배포가 안 됐는가
@@ -205,6 +210,27 @@ GEMINI_API_KEY
 ---
 
 ## 막혔을 때
+
+**배포는 `Ready` 인데 모든 주소가 404 (`X-Vercel-Error: NOT_FOUND`)**
+Vercel **Settings → Build and Deployment → Framework Preset** 이 `Other` 로 되어 있는지 확인하세요.
+**`Next.js` 여야 합니다.**
+
+`Other` 로 두면 Vercel 이 `npm run build` 는 실행하지만, 그 뒤 정적 파일 폴더(`public` 또는 `.`)만
+찾아서 올립니다. Next.js 의 `.next` 산출물·서버 함수·라우팅·미들웨어를 전혀 모릅니다.
+그래서 빌드는 성공하는데 서빙할 경로가 하나도 없어 `/`, `/login`, `/favicon.ico`,
+`/_next/static/` 까지 전부 404 가 됩니다.
+
+고친 뒤 **반드시 Redeploy** 하세요. 설정만 바꿔도 기존 배포는 다시 빌드되지 않습니다.
+제대로 인식되면 빌드 로그에 라우트 목록(`○ /login`, `ƒ /teacher/dashboard` 같은 표)이 출력됩니다.
+
+**로그인 화면이 아니라 Vercel 로그인 페이지가 나온다** (`title: Login – Vercel`)
+**Settings → Deployment Protection → Vercel Authentication → Require Log In** 을 끄세요.
+확인 문구로 `disable vercel authentication` 을 입력해야 합니다.
+아래 **Password Protection** 도 꺼져 있어야 합니다.
+
+이건 Vercel 이 사이트 전체 앞에 세우는 별도 관문이라, 켜져 있으면 교사·학생이 로그인 화면에조차
+접근할 수 없습니다. 끄더라도 앱 자체 인증은 그대로입니다 —
+`/teacher/*`, `/student/*` 는 각 레이아웃이 서버에서 로그인 화면으로 되돌립니다.
 
 **배포가 또 실패한다**
 Vercel → Deployments → 실패한 배포 클릭 → **Building** 로그를 펼쳐 빨간 줄을 확인하세요.
