@@ -47,6 +47,36 @@
 > 파일 하나에 테이블 15개 + 보안정책(RLS) + 트리거 + 초대코드 함수 + 실시간 쪽지 설정이 모두 들어 있습니다. 이것만 실행하면 됩니다.
 > **여러 번 실행해도 안전합니다** — 기존 정책·트리거를 먼저 지우고 다시 만들며, 테이블의 데이터는 지우지 않습니다.
 
+<details>
+<summary><b>이미 쓰고 있던 프로젝트에 적용하면 무엇이 바뀌는지</b> (펼쳐보기)</summary>
+
+테이블과 데이터는 **손대지 않습니다** (`create table if not exists`).
+바뀌는 건 보안정책과 함수뿐입니다.
+
+**고쳐지는 것**
+
+- `increment_invite_code` 함수가 없으면 새로 만듭니다.
+  이 함수가 없으면 초대코드로 가입해도 사용횟수가 올라가지 않아 **한도 제한이 무력화**됩니다.
+- `assignments` / `assignment_classes` 의 학생 조회 정책이 `true`(무조건 허용)였다면
+  자기 반 것만 보이도록 좁힙니다. `true` 였다는 건 **DB 안의 모든 학생이 모든 교사의
+  과제를 읽을 수 있었다**는 뜻입니다.
+- 학생이 담당 교사의 이름을 읽을 수 있게 합니다. 이게 없으면 쪽지 발신자가 빈칸으로 나옵니다.
+- 교사 권한을 "역할이 teacher 인가"에서 "내가 담당한 학생인가 / 내가 만든 자료인가"로
+  좁힙니다. 전자는 **아무 교사나 남의 학생 평가·제출물·관찰기록을 볼 수 있는** 조건입니다.
+
+**주의**
+
+- `public` 스키마의 **기존 정책을 전부 지우고** 이 파일의 정책으로 교체합니다.
+  직접 추가해 두신 정책이 있다면 사라집니다.
+- `teacher_id` 가 비어 있는 학생은 담당 교사가 조회·수정할 수 없게 됩니다.
+  아래 쿼리로 미리 확인하세요.
+
+```sql
+select id, name from profiles where role = 'student' and teacher_id is null;
+```
+
+</details>
+
 **확인**: 왼쪽 **Table Editor** 에서 테이블 15개가 보이는지 봅니다.
 `classes, invite_codes, profiles, badges, student_badges, assessments, assessment_classes,
 assessment_items, student_assessment_checks, assignments, assignment_classes,

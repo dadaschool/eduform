@@ -247,16 +247,9 @@ end $$;
 -- 그 서브쿼리에도 같은 정책이 적용되어 아래 오류가 난다.
 --   ERROR: infinite recursion detected in policy for relation "profiles"
 -- security definer 함수는 RLS 를 우회하므로 이 고리를 끊는다.
-create or replace function current_user_role()
-returns text
-language sql
-security definer
-stable
-set search_path = public
-as $$
-  select role from profiles where id = auth.uid()
-$$;
-
+-- 예전 정책에 있던 current_user_role() 은 쓰지 않는다. 역할만 보고 허용하면
+-- 아무 교사나 남의 학생 데이터에 접근할 수 있어, 아래 정책들은 모두
+-- teacher_id / 소유 관계로 범위를 좁혔다.
 create or replace function current_user_teacher_id()
 returns uuid
 language sql
@@ -294,6 +287,22 @@ as $$
   )
 $$;
 
+-- 이 평가 항목이 내가 만든 평가에 속하는지 (평가결과 접근 범위 판단용)
+create or replace function is_my_assessment_item(p_item_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from assessment_items ai
+    join assessments a on a.id = ai.assessment_id
+    where ai.id = p_item_id and a.teacher_id = auth.uid()
+  )
+$$;
+
 create or replace function is_assignment_for_my_class(p_assignment_id uuid)
 returns boolean
 language sql
@@ -310,20 +319,24 @@ as $$
   )
 $$;
 
--- profiles: 본인 조회/수정, 교사는 학생 조회, 학생은 자기 담당 교사 조회
+-- profiles
+-- 역할만 보고 허용하면 아무 교사나 남의 학생까지 보고 고칠 수 있다.
+-- teacher_id 로 좁혀 자기가 담당한 학생만 다루게 한다.
+-- (teacher_id 가 빈 학생은 담당 교사가 다룰 수 없다. 학생 계정은 초대코드 가입과
+--  create-student API 양쪽 모두 teacher_id 를 채운다)
 create policy "profiles_select" on profiles for select using (
   auth.uid() = id
-  or current_user_role() = 'teacher'
+  or teacher_id = auth.uid()
   -- 학생이 쪽지 발신자(선생님) 이름을 표시할 수 있어야 한다
   or id = current_user_teacher_id()
 );
 create policy "profiles_insert" on profiles for insert with check (auth.uid() = id);
 create policy "profiles_update" on profiles for update using (
   auth.uid() = id
-  or current_user_role() = 'teacher'
+  or teacher_id = auth.uid()
 );
 create policy "profiles_delete" on profiles for delete using (
-  current_user_role() = 'teacher'
+  teacher_id = auth.uid()
 );
 
 -- classes: 교사만 CRUD
@@ -350,8 +363,9 @@ create policy "assessment_classes_teacher" on assessment_classes for all using (
 create policy "assessment_items_teacher" on assessment_items for all using (
   exists (select 1 from assessments a where a.id = assessment_id and a.teacher_id = auth.uid())
 );
+-- 아무 교사나 남의 학생 평가결과를 보지 못하게, 평가를 만든 교사로 좁힌다.
 create policy "student_assessment_checks_teacher" on student_assessment_checks for all using (
-  current_user_role() = 'teacher'
+  is_my_assessment_item(assessment_item_id)
 );
 create policy "student_assessment_checks_student_select" on student_assessment_checks for select using (
   auth.uid() = student_id
@@ -371,8 +385,9 @@ create policy "assignment_classes_student_select" on assignment_classes for sele
 create policy "assignments_student_select" on assignments for select using (
   is_assignment_for_my_class(id)
 );
+-- 아무 교사나 남의 학생 제출물을 보지 못하게, 과제를 낸 교사로 좁힌다.
 create policy "assignment_submissions_teacher" on assignment_submissions for all using (
-  current_user_role() = 'teacher'
+  is_my_assignment(assignment_id)
 );
 create policy "assignment_submissions_student" on assignment_submissions for all using (
   auth.uid() = student_id
