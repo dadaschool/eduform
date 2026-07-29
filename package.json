@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:setup": "node scripts/db-setup.mjs",
+    "db:seed": "node scripts/db-setup.mjs --seed",
+    "doctor": "node scripts/doctor.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -34,6 +37,7 @@
     "@types/react-dom": "^18",
     "eslint": "^8",
     "eslint-config-next": "^14.2.29",
+    "pg": "^8.22.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
