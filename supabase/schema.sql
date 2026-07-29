@@ -119,7 +119,9 @@ create table if not exists student_assessment_checks (
   assessment_item_id uuid not null references assessment_items(id) on delete cascade,
   check_value text,          -- 'O'/'X', '상'/'중'/'하', '완료'/'보류'/'미제출', '85', '피아노 잘 침' 등
   teacher_memo text,
-  updated_by uuid references auth.users(id),
+  -- 기록용 컬럼이므로 계정이 지워지면 비운다.
+  -- on delete 를 지정하지 않으면 이 값이 교사 계정 삭제를 막는다.
+  updated_by uuid references auth.users(id) on delete set null,
   updated_at timestamptz default now(),
   unique(student_id, assessment_item_id)
 );
@@ -153,7 +155,8 @@ create table if not exists assignment_submissions (
   submitted_at timestamptz default now(),
   feedback text,
   feedback_at timestamptz,
-  feedback_by uuid references auth.users(id),
+  -- 기록용 컬럼이므로 계정이 지워지면 비운다 (updated_by 와 같은 이유)
+  feedback_by uuid references auth.users(id) on delete set null,
   unique(assignment_id, student_id)
 );
 
@@ -274,6 +277,39 @@ as $$
   select class_id from profiles where id = auth.uid()
 $$;
 
+-- assignments 의 정책이 assignment_classes 를 조회하고,
+-- assignment_classes 의 정책이 다시 assignments 를 조회하면 서로를 물어
+--   ERROR: infinite recursion detected in policy for relation "assignment_classes"
+-- 가 난다. 두 판단을 RLS 우회 함수로 빼서 고리를 끊는다.
+create or replace function is_my_assignment(p_assignment_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from assignments
+    where id = p_assignment_id and teacher_id = auth.uid()
+  )
+$$;
+
+create or replace function is_assignment_for_my_class(p_assignment_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from assignment_classes ac
+    join profiles p on p.id = auth.uid()
+    where ac.assignment_id = p_assignment_id
+      and ac.class_id = p.class_id
+  )
+$$;
+
 -- profiles: 본인 조회/수정, 교사는 학생 조회, 학생은 자기 담당 교사 조회
 create policy "profiles_select" on profiles for select using (
   auth.uid() = id
@@ -324,7 +360,7 @@ create policy "student_assessment_checks_student_select" on student_assessment_c
 -- assignments
 create policy "assignments_teacher" on assignments for all using (auth.uid() = teacher_id);
 create policy "assignment_classes_teacher" on assignment_classes for all using (
-  exists (select 1 from assignments a where a.id = assignment_id and a.teacher_id = auth.uid())
+  is_my_assignment(assignment_id)
 );
 -- 원래 조건은 (p.class_id = class_id) 였는데, 규칙 없는 class_id 가
 -- 서브쿼리 안쪽의 p.class_id 로 해석되어 항상 참이 되었다.
@@ -333,11 +369,7 @@ create policy "assignment_classes_student_select" on assignment_classes for sele
   class_id = current_user_class_id()
 );
 create policy "assignments_student_select" on assignments for select using (
-  exists (
-    select 1 from assignment_classes ac
-    where ac.assignment_id = assignments.id
-      and ac.class_id = current_user_class_id()
-  )
+  is_assignment_for_my_class(id)
 );
 create policy "assignment_submissions_teacher" on assignment_submissions for all using (
   current_user_role() = 'teacher'
