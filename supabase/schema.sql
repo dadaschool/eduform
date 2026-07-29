@@ -226,24 +226,74 @@ alter table observations enable row level security;
 alter table student_record_drafts enable row level security;
 alter table messages enable row level security;
 
--- profiles: 본인 조회/수정, 교사는 자신이 담당한 학생 조회
+-- 이 파일은 여러 번 실행해도 안전해야 한다.
+-- create policy 는 if not exists 를 지원하지 않으므로 기존 정책을 먼저 지운다.
+do $$
+declare r record;
+begin
+  for r in select schemaname, tablename, policyname from pg_policies where schemaname = 'public'
+  loop
+    execute format('drop policy if exists %I on %I.%I', r.policyname, r.schemaname, r.tablename);
+  end loop;
+end $$;
+
+-- ---------------------------------------------
+-- 내 정보를 읽는 헬퍼 함수
+-- ---------------------------------------------
+-- profiles 의 정책 안에서 profiles 를 다시 조회하면
+-- 그 서브쿼리에도 같은 정책이 적용되어 아래 오류가 난다.
+--   ERROR: infinite recursion detected in policy for relation "profiles"
+-- security definer 함수는 RLS 를 우회하므로 이 고리를 끊는다.
+create or replace function current_user_role()
+returns text
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select role from profiles where id = auth.uid()
+$$;
+
+create or replace function current_user_teacher_id()
+returns uuid
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select teacher_id from profiles where id = auth.uid()
+$$;
+
+create or replace function current_user_class_id()
+returns uuid
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select class_id from profiles where id = auth.uid()
+$$;
+
+-- profiles: 본인 조회/수정, 교사는 학생 조회, 학생은 자기 담당 교사 조회
 create policy "profiles_select" on profiles for select using (
   auth.uid() = id
-  or exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'teacher')
+  or current_user_role() = 'teacher'
+  -- 학생이 쪽지 발신자(선생님) 이름을 표시할 수 있어야 한다
+  or id = current_user_teacher_id()
 );
 create policy "profiles_insert" on profiles for insert with check (auth.uid() = id);
 create policy "profiles_update" on profiles for update using (
   auth.uid() = id
-  or exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'teacher')
+  or current_user_role() = 'teacher'
 );
 create policy "profiles_delete" on profiles for delete using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'teacher')
+  current_user_role() = 'teacher'
 );
 
 -- classes: 교사만 CRUD
 create policy "classes_all" on classes for all using (auth.uid() = teacher_id);
 create policy "classes_student_select" on classes for select using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.class_id = classes.id)
+  id = current_user_class_id()
 );
 
 -- invite_codes: 교사 관리
@@ -265,7 +315,7 @@ create policy "assessment_items_teacher" on assessment_items for all using (
   exists (select 1 from assessments a where a.id = assessment_id and a.teacher_id = auth.uid())
 );
 create policy "student_assessment_checks_teacher" on student_assessment_checks for all using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'teacher')
+  current_user_role() = 'teacher'
 );
 create policy "student_assessment_checks_student_select" on student_assessment_checks for select using (
   auth.uid() = student_id
@@ -276,18 +326,21 @@ create policy "assignments_teacher" on assignments for all using (auth.uid() = t
 create policy "assignment_classes_teacher" on assignment_classes for all using (
   exists (select 1 from assignments a where a.id = assignment_id and a.teacher_id = auth.uid())
 );
+-- 원래 조건은 (p.class_id = class_id) 였는데, 규칙 없는 class_id 가
+-- 서브쿼리 안쪽의 p.class_id 로 해석되어 항상 참이 되었다.
+-- 그래서 모든 학생이 다른 반의 과제 배포 정보까지 볼 수 있었다.
 create policy "assignment_classes_student_select" on assignment_classes for select using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.class_id = class_id)
+  class_id = current_user_class_id()
 );
 create policy "assignments_student_select" on assignments for select using (
   exists (
     select 1 from assignment_classes ac
-    join profiles p on p.class_id = ac.class_id
-    where ac.assignment_id = assignments.id and p.id = auth.uid()
+    where ac.assignment_id = assignments.id
+      and ac.class_id = current_user_class_id()
   )
 );
 create policy "assignment_submissions_teacher" on assignment_submissions for all using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'teacher')
+  current_user_role() = 'teacher'
 );
 create policy "assignment_submissions_student" on assignment_submissions for all using (
   auth.uid() = student_id
@@ -322,14 +375,24 @@ begin
 end;
 $$ language plpgsql;
 
+-- create trigger 도 if not exists 를 지원하지 않아 먼저 지운다
+drop trigger if exists profiles_updated_at on profiles;
 create trigger profiles_updated_at before update on profiles
   for each row execute function update_updated_at();
+
+drop trigger if exists assessments_updated_at on assessments;
 create trigger assessments_updated_at before update on assessments
   for each row execute function update_updated_at();
+
+drop trigger if exists assignments_updated_at on assignments;
 create trigger assignments_updated_at before update on assignments
   for each row execute function update_updated_at();
+
+drop trigger if exists observations_updated_at on observations;
 create trigger observations_updated_at before update on observations
   for each row execute function update_updated_at();
+
+drop trigger if exists drafts_updated_at on student_record_drafts;
 create trigger drafts_updated_at before update on student_record_drafts
   for each row execute function update_updated_at();
 

@@ -36,6 +36,7 @@
 4. `Success. No rows returned` 가 나오면 성공입니다.
 
 > 파일 하나에 테이블 15개 + 보안정책(RLS) + 트리거 + 초대코드 함수 + 실시간 쪽지 설정이 모두 들어 있습니다. 이것만 실행하면 됩니다.
+> **여러 번 실행해도 안전합니다** — 기존 정책·트리거를 먼저 지우고 다시 만들며, 테이블의 데이터는 지우지 않습니다.
 
 **확인**: 왼쪽 **Table Editor** 에서 테이블 15개가 보이는지 봅니다.
 `classes, invite_codes, profiles, badges, student_badges, assessments, assessment_classes,
