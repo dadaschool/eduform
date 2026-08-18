@@ -100,6 +100,7 @@ const FNS = [
   ['is_my_assessment_item', { p_item_id: NIL }],
   ['is_assignment_for_my_class', { p_assignment_id: NIL }],
   ['increment_invite_code', { code: '__doctor_probe__' }],
+  ['verify_invite_code', { p_code: '__doctor_probe__' }],
 ]
 const noFn = []
 for (const [fn, args] of FNS) {
@@ -110,7 +111,7 @@ for (const [fn, args] of FNS) {
   })
   if (res.status === 404) noFn.push(fn)
 }
-if (noFn.length === 0) console.log(ok('6개 전부 있음'))
+if (noFn.length === 0) console.log(ok(`${FNS.length}개 전부 있음`))
 else fail(`없는 함수: ${noFn.join(', ')}`, 'supabase/schema.sql 을 (다시) 실행하세요')
 
 // ─────────────────────────────────────────────
