@@ -29,17 +29,16 @@ export default function RegisterPage() {
       // 렌더 시점이 아니라 실제 조회 시점에 클라이언트를 만든다.
       // 이 페이지는 빌드 때 정적 생성되므로, 본문에서 만들면 환경변수 없이 빌드가 깨진다.
       const supabase = createClient()
-      const { data, error } = await supabase
-        .from('invite_codes')
-        .select('id, class_id, teacher_id, is_active, expires_at, max_uses, used_count, classes(name)')
-        .eq('code', inviteCode.toUpperCase().trim())
-        .single()
-      if (error || !data) throw new Error('유효하지 않은 초대코드입니다.')
-      if (!data.is_active) throw new Error('만료된 초대코드입니다.')
-      if (data.expires_at && new Date(data.expires_at) < new Date()) throw new Error('만료된 초대코드입니다.')
-      if (data.used_count >= data.max_uses) throw new Error('초대코드 사용 한도에 도달했습니다.')
-      const cls = data.classes as unknown as { name: string }
-      setClassInfo({ id: data.class_id, name: cls.name, teacherId: data.teacher_id })
+      // invite_codes 를 직접 조회하지 않는다. 그러면 활성 코드 목록이 전부
+      // 열거되어 모르는 사람이 아무 반에나 들어올 수 있다.
+      // 유효기간·사용한도 확인과 반 이름 조회를 이 함수 하나가 처리한다.
+      const { data, error } = await supabase.rpc('verify_invite_code', {
+        p_code: inviteCode.toUpperCase().trim(),
+      })
+      if (error) throw new Error('코드 확인 중 오류가 발생했습니다.')
+      const row = Array.isArray(data) ? data[0] : data
+      if (!row) throw new Error('유효하지 않거나 사용할 수 없는 초대코드입니다.')
+      setClassInfo({ id: row.class_id, name: row.class_name, teacherId: row.teacher_id })
       setStep('info')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : '코드 확인에 실패했습니다.')

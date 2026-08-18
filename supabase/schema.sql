@@ -319,6 +319,31 @@ as $$
   )
 $$;
 
+-- 초대코드 검증. 가입 화면은 로그인 전에 코드를 확인해야 한다.
+-- invite_codes 를 직접 읽게 하면 활성 코드 목록이 전부 열거되어,
+-- 모르는 사람이 코드를 긁어 아무 반에나 학생으로 들어올 수 있다.
+-- 그래서 테이블 조회는 막고, 코드를 아는 사람에게만 필요한 값을 돌려준다.
+-- security definer 라서 classes 조회도 함께 되어 반 이름을 얻을 수 있다.
+-- (직접 임베드하면 classes 가 비로그인에 막혀 null 이 되고 가입이 실패한다)
+create or replace function verify_invite_code(p_code text)
+returns table (class_id uuid, class_name text, teacher_id uuid)
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select c.id, c.name, ic.teacher_id
+  from invite_codes ic
+  join classes c on c.id = ic.class_id
+  where ic.code = upper(trim(p_code))
+    and ic.is_active
+    and (ic.expires_at is null or ic.expires_at > now())
+    and ic.used_count < ic.max_uses
+$$;
+
+-- 비로그인 상태에서 호출해야 하므로 anon 에게도 실행 권한을 준다.
+grant execute on function verify_invite_code(text) to anon, authenticated;
+
 -- profiles
 -- 역할만 보고 허용하면 아무 교사나 남의 학생까지 보고 고칠 수 있다.
 -- teacher_id 로 좁혀 자기가 담당한 학생만 다루게 한다.
@@ -347,11 +372,16 @@ create policy "classes_student_select" on classes for select using (
 
 -- invite_codes: 교사 관리
 create policy "invite_codes_teacher" on invite_codes for all using (auth.uid() = teacher_id);
-create policy "invite_codes_student_select" on invite_codes for select using (is_active = true);
+-- 학생용 조회 정책을 두지 않는다. 코드 확인은 verify_invite_code() 로만 한다.
+-- is_active = true 조건으로 열어두면 활성 코드 전체가 열거된다.
 
 -- badges
 create policy "badges_teacher" on badges for all using (auth.uid() = teacher_id);
-create policy "badges_student_select" on badges for select using (true);
+-- using (true) 는 로그인하지 않은 사람에게도 배지 정의를 전부 보여준다.
+-- 학생은 자기 담당 교사의 배지만 알면 된다 (내 배지 화면의 badges 임베드).
+create policy "badges_student_select" on badges for select using (
+  teacher_id = current_user_teacher_id()
+);
 create policy "student_badges_teacher" on student_badges for all using (auth.uid() = awarded_by);
 create policy "student_badges_student_select" on student_badges for select using (auth.uid() = student_id);
 
