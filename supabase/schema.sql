@@ -406,6 +406,38 @@ as $$
   )
 $$;
 
+-- 이 교사가 내(학생) 반을 담당하는가.
+-- 학생 화면에서 담당 교사 이름을 표시하고 쪽지 상대를 고를 때 쓴다.
+-- 예전에는 담임(profiles.teacher_id) 한 명만 볼 수 있어서, 교과 교사가
+-- 준 배지나 보낸 쪽지의 이름이 빈칸으로 나왔다.
+create or replace function is_my_class_teacher(p_teacher_id uuid)
+returns boolean
+language sql security definer stable set search_path = public
+as $$
+  select exists (
+    select 1
+    from profiles me
+    join class_teachers ct on ct.class_id = me.class_id
+    where me.id = auth.uid() and ct.teacher_id = p_teacher_id
+  )
+$$;
+
+-- 내 반을 담당하는 교사 목록. 담임을 먼저 보여준다.
+-- class_teachers 를 학생에게 직접 열지 않고 필요한 값만 돌려준다.
+create or replace function my_teachers()
+returns table (id uuid, name text, kind text)
+language sql security definer stable set search_path = public
+as $$
+  select p.id, p.name, ct.role
+  from profiles me
+  join class_teachers ct on ct.class_id = me.class_id
+  join profiles p on p.id = ct.teacher_id
+  where me.id = auth.uid()
+  order by (ct.role = 'homeroom') desc, p.name
+$$;
+
+grant execute on function my_teachers() to authenticated;
+
 -- 초대코드 검증. 가입 화면은 로그인 전에 코드를 확인해야 한다.
 -- invite_codes 를 직접 읽게 하면 활성 코드 목록이 전부 열거되어,
 -- 모르는 사람이 코드를 긁어 아무 반에나 학생으로 들어올 수 있다.
@@ -521,6 +553,7 @@ create policy "profiles_select" on profiles for select using (
   or teacher_id = auth.uid()                -- 담임으로 등록된 학생 (반 배정 전이라도)
   -- 학생이 쪽지 발신자(선생님) 이름을 표시할 수 있어야 한다
   or id = current_user_teacher_id()
+  or is_my_class_teacher(id)                -- 내 반을 담당하는 교사 전원
   or is_admin()                             -- 관리자는 계정 관리를 위해 전체 조회
 );
 
@@ -597,8 +630,11 @@ create policy "badges_teacher" on badges for all using (
 );
 -- using (true) 는 로그인하지 않은 사람에게도 배지 정의를 전부 보여준다.
 -- 학생은 자기 담당 교사의 배지만 알면 된다 (내 배지 화면의 badges 임베드).
+-- 담임뿐 아니라 내 반을 담당하는 교사가 만든 배지도 이름이 보여야 한다.
+-- 담임만 허용하면 교과 교사가 준 배지의 이름이 빈칸으로 나온다.
 create policy "badges_student_select" on badges for select using (
   teacher_id = current_user_teacher_id()
+  or is_my_class_teacher(teacher_id)
 );
 create policy "student_badges_teacher" on student_badges for all using (
   auth.uid() = awarded_by and is_teacher()
