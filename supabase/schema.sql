@@ -608,8 +608,11 @@ create trigger invite_codes_teacher_expiry before insert or update on invite_cod
 create policy "classes_teacher_select" on classes for select using (
   is_teacher() or is_admin()
 );
+-- 반 목록은 관리자가 넣는다. 교사는 그 목록에서 담당할 반을 고른다.
+-- 교사도 만들 수 있게 남겨 둔다. 반이 없으면 학생을 넣을 수 없어 관리자가
+-- 자리에 없을 때 아무것도 시작할 수 없다. teacher_id 는 만든 사람 기록용이다.
 create policy "classes_insert" on classes for insert with check (
-  auth.uid() = teacher_id and is_teacher()
+  (auth.uid() = teacher_id and is_teacher()) or is_admin()
 );
 -- 수정은 담당 교사 또는 관리자
 create policy "classes_update" on classes for update using (

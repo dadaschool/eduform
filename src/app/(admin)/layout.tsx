@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { ShieldCheck, Users, LogOut } from 'lucide-react'
+import { ShieldCheck, Users, School, LogOut } from 'lucide-react'
 import NoProfileNotice from '@/components/NoProfileNotice'
 import { routeForRole } from '@/lib/route-for-role'
 
@@ -38,6 +38,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
         </div>
         <nav className="flex-1 p-2 space-y-1">
+          <Link href="/admin/classes"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
+            <School className="w-4 h-4" />반 관리
+          </Link>
           <Link href="/admin/users"
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
             <Users className="w-4 h-4" />사용자 관리
