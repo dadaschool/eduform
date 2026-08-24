@@ -10,8 +10,7 @@
     "db:setup": "node scripts/db-setup.mjs",
     "db:seed": "node scripts/db-setup.mjs --seed",
     "doctor": "node scripts/doctor.mjs",
-    "test:ai-gate": "node scripts/ai-gate-test.mjs",
-    "selfhost:keys": "node scripts/selfhost-keys.mjs"
+    "test:ai-gate": "node scripts/ai-gate-test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -24,7 +23,6 @@
     "lucide-react": "^1.21.0",
     "next": "^14.2.29",
     "next-themes": "^0.3.0",
-    "pg": "^8.22.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "shadcn": "^4.11.0",
@@ -41,6 +39,7 @@
     "@types/react-dom": "^18",
     "eslint": "^8",
     "eslint-config-next": "^14.2.29",
+    "pg": "^8.22.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

@@ -10,7 +10,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner'
 import { Plus, Trash2, Reply, Search, Inbox, Send, MessageCircle, X } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
-import { usePoll, MESSAGE_POLL_MS } from '@/lib/use-poll'
 
 interface Message {
   id: string
@@ -88,11 +87,18 @@ export default function StudentMessagesPage() {
     fetchData(me, teacherId)
   }, [me, teacherId, fetchData])
 
-  // 새 쪽지 확인 — 실시간 구독 대신 주기적으로 다시 읽는다.
-  // (Realtime 서버는 윈도우 빌드가 없어 교내 서버에 띄울 수 없다)
-  usePoll(() => {
-    if (me && teacherId) fetchData(me, teacherId)
-  }, MESSAGE_POLL_MS, Boolean(me && teacherId))
+  // Realtime
+  useEffect(() => {
+    if (!me || !teacherId) return
+    const channel = supabase
+      .channel(`student-msg-${me}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'messages',
+        filter: `receiver_id=eq.${me}`,
+      }, () => { fetchData(me, teacherId) })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [me, teacherId, supabase, fetchData])
 
   const teacherName = teachers.find(t => t.id === teacherId)?.name ?? '선생님'
   const inbox = messages.filter(m => m.receiver_id === me)
