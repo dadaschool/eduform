@@ -56,8 +56,26 @@ export async function POST(req: Request) {
       : { email, name, role }
 
     // 같은 이메일이 이미 있으면 비밀번호만 바꾼다 (명단을 다시 올릴 때를 위해)
-    const { data: existingUsers } = await adminClient.auth.admin.listUsers()
-    const existing = existingUsers?.users?.find(u => u.email === email)
+    //
+    // ⚠ listUsers() 는 기본값이 «1쪽 50명» 이다. 학교 인원은 50명을 쉽게 넘으므로
+    //   목록만 뒤지면 51번째 사람부터 «없는 사람» 으로 보이고, 이어서 계정 생성이
+    //   «이미 등록된 이메일» 로 실패한다. 그래서 profiles 를 먼저 본다 —
+    //   여기엔 이메일이 그대로 있고 인원 수와 무관하게 정확하다.
+    const { data: byProfile } = await adminClient
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+
+    let existing: { id: string } | null = byProfile ?? null
+
+    // profiles 에 없더라도 auth 쪽에만 남아 있을 수 있다 (계정은 만들어졌는데
+    // 프로필 생성이 실패한 경우). 그때만 목록을 뒤진다. 넉넉한 쪽수로 부른다.
+    if (!existing) {
+      const { data: existingUsers } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 })
+      const found = existingUsers?.users?.find(u => u.email === email)
+      existing = found ? { id: found.id } : null
+    }
 
     if (existing) {
       await adminClient.auth.admin.updateUserById(existing.id, { password })

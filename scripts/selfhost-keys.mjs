@@ -102,39 +102,46 @@ if (process.argv.includes('--selftest')) selftest()
 // --- 새 키 세트 ---
 const { jwtSecret, anonKey, serviceKey } = makeKeys()
 const pgPassword = alnum(32)
-const dashPassword = alnum(20)
+const authPassword = alnum(32)
 const host = process.env.EDUFORM_HOST || '<서버IP>'
 
 console.log(`
 ================================================================
-  1) selfhost/.env  (Supabase 스택용)
+  1) Postgres 비밀번호 정하기 — psql 에서 한 번만
 ================================================================
-POSTGRES_PASSWORD=${pgPassword}
-JWT_SECRET=${jwtSecret}
-ANON_KEY=${anonKey}
-SERVICE_ROLE_KEY=${serviceKey}
-DASHBOARD_USERNAME=admin
-DASHBOARD_PASSWORD=${dashPassword}
-SITE_URL=http://${host}:3000
-API_EXTERNAL_URL=http://${host}:8000
-SUPABASE_PUBLIC_URL=http://${host}:8000
+alter user postgres with password '${pgPassword}';
+alter role authenticator with password '${authPassword}';
 
 ================================================================
-  2) .env.local  (에듀폼용)
+  2) C:\\srv\\eduform\\.env.local   (에듀폼)
 ================================================================
-NEXT_PUBLIC_SUPABASE_URL=http://${host}:8000
+NEXT_PUBLIC_SUPABASE_URL=http://${host}:3000
 NEXT_PUBLIC_SUPABASE_ANON_KEY=${anonKey}
 SUPABASE_SERVICE_ROLE_KEY=${serviceKey}
-SUPABASE_DB_URL=postgresql://postgres:${pgPassword}@localhost:5432/postgres
+SUPABASE_JWT_SECRET=${jwtSecret}
+AUTH_DB_URL=postgresql://postgres:${pgPassword}@127.0.0.1:5432/postgres
+POSTGREST_URL=http://127.0.0.1:3001
+
+================================================================
+  3) C:\\srv\\postgrest\\postgrest.conf   (데이터 API)
+================================================================
+db-uri = "postgres://authenticator:${authPassword}@127.0.0.1:5432/postgres"
+db-schemas = "public"
+db-anon-role = "anon"
+db-pool = 10
+jwt-secret = "${jwtSecret}"
+server-host = "127.0.0.1"
+server-port = 3001
 
 ================================================================
   주의
 ================================================================
-- <서버IP> 는 학생·교사 기기에서 접속할 주소다. localhost 로 두면
-  서버 컴퓨터 브라우저에서만 로그인된다. (브라우저가 8000 번에 직접 붙는다)
-  EDUFORM_HOST=10.91.10.127 node scripts/selfhost-keys.mjs 처럼 지정하면
-  주소까지 채워서 출력한다.
+- NEXT_PUBLIC_SUPABASE_URL 의 <서버IP> 는 학생·교사 기기에서 접속할 주소다.
+  localhost 로 두면 서버 컴퓨터에서만 로그인된다.
+  EDUFORM_HOST=10.91.10.127 npm run selfhost:keys 처럼 지정하면 채워서 출력한다.
+- jwt-secret 과 SUPABASE_JWT_SECRET 은 «같은 값» 이어야 한다. 어긋나면
+  모든 데이터 요청이 401 로 떨어진다. 위 출력은 이미 같게 맞춰져 있다.
 - SERVICE_ROLE_KEY 는 RLS 를 무시한다. 깃·채팅·학생 기기에 절대 넣지 않는다.
-- JWT_SECRET 을 바꾸면 위 두 키를 다시 만들어야 한다.
+- PostgREST 와 Postgres 는 127.0.0.1 에만 붙는다. 바깥에 열 포트는 3000 뿐이다.
 - 이 값들을 잃어버리면 DB 접속과 로그인이 모두 막힌다. 지금 안전한 곳에 옮겨둔다.
 `)
