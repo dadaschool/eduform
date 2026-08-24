@@ -39,7 +39,26 @@
 
 ## 0단계 — 서버 컴퓨터 확인
 
-설치할 컴퓨터에서 PowerShell 을 열고 그대로 붙여넣습니다.
+**PowerShell 은 따로 설치할 필요가 없습니다.** 윈도우 7 이후 모든 윈도우에 들어 있습니다
+(Windows Server 도 포함). 여는 방법은 셋 중 아무거나:
+
+- 시작 단추를 **오른쪽 클릭** → `Windows PowerShell` 또는 `터미널`
+- `Win` + `R` → `powershell` 입력 → 엔터
+- 시작 메뉴에서 `powershell` 검색
+
+관리자로 열어야 하는 단계(1·8·9)에서는 **오른쪽 클릭 → 관리자 권한으로 실행**을 하세요.
+
+열렸으면 확인:
+
+```powershell
+$PSVersionTable.PSVersion
+if (Get-Command winget -ErrorAction SilentlyContinue) { 'winget 있음' } else { 'winget 없음 — 1단계 대비책을 보세요' }
+```
+
+`5.1` 이상이면 이 안내서의 모든 명령이 됩니다 (5.1 에서 실제로 확인했습니다).
+PowerShell 7 을 따로 깔 필요는 없습니다.
+
+그다음 사양을 봅니다. 그대로 붙여넣으세요.
 
 ```powershell
 $w = Get-CimInstance Win32_OperatingSystem
@@ -78,6 +97,16 @@ winget install -e --id Git.Git
 winget install -e --id OpenJS.NodeJS.LTS
 winget install -e --id PostgreSQL.PostgreSQL.17
 ```
+
+> **`winget 없음` 이 나왔다면** — 윈도우 11 에는 있고, 윈도우 10 은 스토어에서 `앱 설치 관리자`
+> (App Installer) 를 받으면 생깁니다. **Windows Server 에는 없는 경우가 많습니다.**
+> 그럴 때는 브라우저로 직접 받아 설치하세요. 결과는 같습니다.
+>
+> | | 주소 | 받을 것 |
+> |---|---|---|
+> | Git | <https://git-scm.com/download/win> | 64-bit 설치본 |
+> | Node.js | <https://nodejs.org> | **LTS** `.msi` |
+> | PostgreSQL | <https://www.postgresql.org/download/windows/> | 17 버전 설치본 |
 
 Postgres 설치 중 **슈퍼유저 비밀번호**를 묻습니다. 아무 값이나 정하고 적어 두세요 (3단계에서
 바꿉니다). 포트는 5432 그대로 둡니다.
