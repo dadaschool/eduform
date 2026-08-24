@@ -521,6 +521,25 @@ end $$;
 
 grant execute on function register_with_invite(text, text, text) to authenticated;
 
+-- 교사 초대코드는 10분만 유효하다.
+--
+-- 코드가 유출되면 외부인이 교사가 되고, 교사는 아무 반에나 스스로 붙을 수
+-- 있으므로 전교생 명단이 노출된다. 그래서 쓸 수 있는 창을 최대한 좁힌다.
+-- 화면에서 expires_at 을 넣는 방식이면 값을 바꿔 우회할 수 있어 DB 에서 깎는다.
+-- 거부하지 않고 깎는 이유는, 무엇을 보내든 10분을 넘지 않게 하려는 것이다.
+create or replace function clamp_teacher_invite_expiry()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.role = 'teacher'
+     and (new.expires_at is null or new.expires_at > now() + interval '10 minutes') then
+    new.expires_at := now() + interval '10 minutes';
+  end if;
+  return new;
+end $$;
+
 -- 역할 변경은 관리자만. RLS 의 with check 로는 이전 값을 볼 수 없어 트리거로 막는다.
 -- security definer 를 쓰지 않는다. 그러면 current_user 가 호출자가 아니라
 -- 함수 소유자(postgres)가 되어 아래 검사가 통째로 무력화된다. 실제로 겪었다.
@@ -578,6 +597,11 @@ create policy "profiles_delete" on profiles for delete using (
 drop trigger if exists profiles_role_guard on profiles;
 create trigger profiles_role_guard before update on profiles
   for each row execute function prevent_role_escalation();
+
+-- 교사 초대코드 유효기간 제한 (위 clamp_teacher_invite_expiry)
+drop trigger if exists invite_codes_teacher_expiry on invite_codes;
+create trigger invite_codes_teacher_expiry before insert or update on invite_codes
+  for each row execute function clamp_teacher_invite_expiry();
 
 -- classes: 교사만 CRUD
 -- 교사는 학교의 모든 반을 조회한다. 목록에서 골라 담당하려면 보여야 한다.

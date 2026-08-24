@@ -38,9 +38,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
         </div>
         <nav className="flex-1 p-2 space-y-1">
-          <Link href="/admin/teachers"
+          <Link href="/admin/users"
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
-            <Users className="w-4 h-4" />교사 관리
+            <Users className="w-4 h-4" />사용자 관리
           </Link>
         </nav>
         <div className="p-2 border-t">
