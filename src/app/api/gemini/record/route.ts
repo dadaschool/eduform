@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { generateText } from '@/lib/ai'
+import { generateText, PaidConfirmRequired, PROVIDER_LABEL } from '@/lib/ai'
 
 export async function POST(req: Request) {
   try {
@@ -8,7 +8,8 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-    const { studentId, subject } = await req.json()
+    // allowPaid — 화면에서 «유료로 진행할까요?» 에 «예» 를 누른 그 한 번만 true 로 온다.
+    const { studentId, subject, allowPaid } = await req.json()
 
     // 학생 정보
     const { data: student } = await supabase.from('profiles').select('*').eq('id', studentId).single()
@@ -74,10 +75,20 @@ ${observationsText || '(데이터 없음)'}
 
 위 자료를 바탕으로 학생부 세특 초안을 작성해 주세요. 교사가 검토·수정할 수 있는 초안 형태로 작성하고, 세특 문장만 출력하세요.`
 
-    const { text: draft, provider } = await generateText({ user: prompt })
+    const { text: draft, provider, paid } = await generateText({ user: prompt, allowPaid: allowPaid === true })
 
-    return NextResponse.json({ draft, provider })
+    return NextResponse.json({ draft, provider, paid })
   } catch (err: unknown) {
+    // 무료 쪽이 죽고 유료만 남았다 — 몰래 쓰지 않고 화면에 되묻는다(402).
+    if (err instanceof PaidConfirmRequired) {
+      return NextResponse.json({
+        needPaidConfirm: true,
+        provider: err.provider,
+        providerLabel: PROVIDER_LABEL[err.provider],
+        freeFailures: err.freeFailures,
+        error: err.message,
+      }, { status: 402 })
+    }
     return NextResponse.json({ error: err instanceof Error ? err.message : 'AI 생성 실패' }, { status: 500 })
   }
 }

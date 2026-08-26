@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { Plus, Trash2, GripVertical, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
+import { callAI, PaidDeclined } from '@/lib/ai-client'
 import { CHECK_TYPE_OPTIONS, type CheckType } from '@/lib/types'
 import type { Class } from '@/lib/types'
 
@@ -76,15 +77,14 @@ export default function NewAssessmentPage() {
     if (!aiPrompt.trim()) { toast.error('AI 요청 내용을 입력해 주세요'); return }
     setAiLoading(true)
     try {
-      const res = await fetch('/api/gemini/assessment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: aiPrompt, subject, title }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      // callAI 가 «유료로 넘어가기 전에» 사람에게 묻는다(자세한 이유는 lib/ai-client.ts).
+      type AIItem = { name: string; description: string; check_type: CheckType; number_min?: number; number_max?: number }
+      const data = await callAI<{ items?: AIItem[]; provider?: string; paid?: boolean }>(
+        '/api/gemini/assessment',
+        { prompt: aiPrompt, subject, title },
+      )
       if (data.items && Array.isArray(data.items)) {
-        const newItems: ItemDraft[] = data.items.map((it: { name: string; description: string; check_type: CheckType; number_min?: number; number_max?: number }) => ({
+        const newItems: ItemDraft[] = data.items.map((it: AIItem) => ({
           id: crypto.randomUUID(),
           name: it.name ?? '',
           description: it.description ?? '',
@@ -94,11 +94,15 @@ export default function NewAssessmentPage() {
         }))
         setItems(prev => [...prev, ...newItems])
         toast.success(`AI가 ${newItems.length}개의 평가 항목을 생성했습니다.`, {
-          description: data.provider === 'upstage' ? '업스테이지 Solar' : 'Google Gemini',
+          description: data.paid
+            ? `${data.provider === 'upstage' ? '업스테이지 Solar' : data.provider} · 💳 유료 — 요금이 청구됩니다`
+            : 'Google Gemini · 무료',
         })
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'AI 생성 실패')
+      // 유료를 «취소» 한 것은 잘못이 아니다 — 붉은 오류로 겁주지 않는다.
+      if (err instanceof PaidDeclined) toast.info(err.message)
+      else toast.error(err instanceof Error ? err.message : 'AI 생성 실패')
     } finally {
       setAiLoading(false)
     }
