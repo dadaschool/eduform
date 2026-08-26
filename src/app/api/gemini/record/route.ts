@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { generateText, PaidConfirmRequired, PROVIDER_LABEL } from '@/lib/ai'
+import { generateText, PaidConfirmRequired, PROVIDER_LABEL, pricingNote } from '@/lib/ai'
 
 export async function POST(req: Request) {
   try {
@@ -85,6 +85,7 @@ ${observationsText || '(데이터 없음)'}
         needPaidConfirm: true,
         provider: err.provider,
         providerLabel: PROVIDER_LABEL[err.provider],
+        pricing: pricingNote(err.provider),
         freeFailures: err.freeFailures,
         error: err.message,
       }, { status: 402 })

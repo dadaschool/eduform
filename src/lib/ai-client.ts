@@ -20,6 +20,8 @@
 interface PaidConfirmBody {
   needPaidConfirm?: boolean
   providerLabel?: string
+  /** 왜 돈이 나가는지 — 서버가 보내 주는 요금 안내 */
+  pricing?: string
   freeFailures?: string[]
   error?: string
 }
@@ -51,6 +53,7 @@ export async function callAI<T>(url: string, body: Record<string, unknown>): Pro
     const ok = window.confirm(
       `무료 AI 가 실패했습니다.\n\n${why}\n\n` +
       `남은 것은 유료 «${info.providerLabel ?? '유료 제공자'}» 뿐입니다.\n` +
+      (info.pricing ? info.pricing + '\n' : '') +
       `쓴 만큼 요금이 청구됩니다.\n\n` +
       `진행할까요?\n\n` +
       `(이 확인은 저장되지 않습니다 — 다음에도 다시 묻습니다)`

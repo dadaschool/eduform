@@ -36,31 +36,47 @@ async function scenario(title, env, run) {
   await run()
 }
 
+
+// 업스테이지는 2027-04-30 까지 무료다. «지금» 과 «무료가 끝난 뒤» 를 나눠서 본다.
+const FREE = new Date('2026-08-26T00:00:00Z')   // 무료 기간 안
+const PAID_ERA = new Date('2027-05-01T00:00:00Z')  // 유료로 바뀐 뒤
+
 const BASE = { GEMINI_API_KEY: 'fake-gemini', UPSTAGE_API_KEY: 'fake-upstage', AI_ALLOW_PAID: null }
 
-// ① 지금 실제 설정 : AI_PRIMARY=upstage (유료가 1순위) + 허락 없음
-await scenario('AI_PRIMARY=upstage · 허락 없음 → 유료를 아예 안 불러야 한다',
+// ① 요금 판단이 «시점» 을 본다
+console.log('\n■ 무료 기간 판단')
+check('지금 업스테이지는 무료다', AI.isPaidProvider('upstage', FREE) === false)
+check('무료 마지막 날(한국시간)도 무료다',
+  AI.isPaidProvider('upstage', new Date('2027-04-30T12:00:00Z')) === false)
+check('2027-05-01 부터 유료다', AI.isPaidProvider('upstage', PAID_ERA) === true)
+check('제미나이는 언제나 무료 등급', AI.isPaidProvider('gemini', PAID_ERA) === false)
+check('요금 안내에 날짜가 들어 있다', AI.pricingNote('upstage').includes('2027-04-30'))
+
+// ② 무료 기간 동안에는 «묻지 않고» 폴백이 그대로 동작해야 한다.
+//    헛되게 매번 묻는 창은 결국 눈감고 누르게 만들고, 정작 돈이 나갈 때의
+//    경고까지 무력해진다.
+await scenario('무료 기간 · Gemini 429 → 묻지 않고 업스테이지로 넘어간다',
+  { ...BASE, AI_PRIMARY: null }, async () => {
+  const r = await AI.generateText({ user: '안녕', at: FREE })
+  check('업스테이지가 답한다', r.provider === 'upstage', `(실제: ${r.provider})`)
+  check('paid 표시가 꺼져 있다', r.paid === false, `(실제: ${r.paid})`)
+  check('업스테이지로 요청이 나갔다', upstageCalls() === 1, `(실제: ${upstageCalls()}건)`)
+})
+
+// ③ 무료 기간이 끝나면 «코드를 고치지 않아도» 다시 막혀야 한다
+await scenario('유료 기간 · 허락 없음 → 유료를 아예 안 부른다',
   { ...BASE, AI_PRIMARY: 'upstage' }, async () => {
   let err = null
-  try { await AI.generateText({ user: '안녕' }) } catch (e) { err = e }
+  try { await AI.generateText({ user: '안녕', at: PAID_ERA }) } catch (e) { err = e }
   check('PaidConfirmRequired 를 던진다', err?.name === 'PaidConfirmRequired', `(실제: ${err?.name})`)
   check('업스테이지로 나간 요청 0건', upstageCalls() === 0, `(실제: ${upstageCalls()}건)`)
   check('무료 실패 이유를 함께 전달한다', (err?.freeFailures ?? []).length > 0, JSON.stringify(err?.freeFailures))
 })
 
-// ② 기본 설정 : gemini 먼저, 실패해도 유료로 넘어가지 않아야 한다
-await scenario('AI_PRIMARY 없음 · Gemini 429 → 조용히 유료로 넘어가면 안 된다',
-  { ...BASE, AI_PRIMARY: null }, async () => {
-  let err = null
-  try { await AI.generateText({ user: '안녕' }) } catch (e) { err = e }
-  check('PaidConfirmRequired 를 던진다', err?.name === 'PaidConfirmRequired', `(실제: ${err?.name})`)
-  check('업스테이지로 나간 요청 0건', upstageCalls() === 0, `(실제: ${upstageCalls()}건)`)
-})
-
 // ③ 사람이 «예» 를 눌렀을 때만 유료가 나간다
 await scenario('allowPaid:true → 그때만 유료를 부른다',
   { ...BASE, AI_PRIMARY: null }, async () => {
-  const r = await AI.generateText({ user: '안녕', allowPaid: true })
+  const r = await AI.generateText({ user: '안녕', allowPaid: true, at: PAID_ERA })
   check('업스테이지가 답한다', r.provider === 'upstage', `(실제: ${r.provider})`)
   check('paid 표시가 켜진다', r.paid === true, `(실제: ${r.paid})`)
   check('업스테이지로 나간 요청 1건', upstageCalls() === 1, `(실제: ${upstageCalls()}건)`)
@@ -69,7 +85,7 @@ await scenario('allowPaid:true → 그때만 유료를 부른다',
 // ④ 서버가 아예 허용해 둔 경우(AI_ALLOW_PAID=1)
 await scenario('AI_ALLOW_PAID=1 → 묻지 않고 유료를 쓴다(일부러 켠 사람용)',
   { ...BASE, AI_PRIMARY: null, AI_ALLOW_PAID: '1' }, async () => {
-  const r = await AI.generateText({ user: '안녕' })
+  const r = await AI.generateText({ user: '안녕', at: PAID_ERA })
   check('업스테이지가 답한다', r.provider === 'upstage', `(실제: ${r.provider})`)
   check('paid 표시가 켜진다', r.paid === true)
 })
