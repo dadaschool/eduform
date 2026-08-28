@@ -34,6 +34,14 @@ export class PaidDeclined extends Error {
   }
 }
 
+/** 등록된 AI API 키가 하나도 없을 때. 화면은 «내 계정» 으로 안내한다. */
+export class NoAiKeys extends Error {
+  constructor() {
+    super('등록된 AI API 키가 없습니다. 내 계정에서 먼저 등록하세요.')
+    this.name = 'NoAiKeys'
+  }
+}
+
 export async function callAI<T>(url: string, body: Record<string, unknown>): Promise<T> {
   async function send(allowPaid: boolean) {
     const res = await fetch(url, {
@@ -62,6 +70,9 @@ export async function callAI<T>(url: string, body: Record<string, unknown>): Pro
     ;({ res, data } = await send(true))
   }
 
-  if (!res.ok) throw new Error((data as PaidConfirmBody)?.error || 'AI 생성 실패')
+  if (!res.ok) {
+    if ((data as PaidConfirmBody)?.error === 'NO_AI_KEYS') throw new NoAiKeys()
+    throw new Error((data as PaidConfirmBody)?.error || 'AI 생성 실패')
+  }
   return data as T
 }

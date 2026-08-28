@@ -12,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { Plus, Trash2, GripVertical, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
-import { callAI, PaidDeclined } from '@/lib/ai-client'
+import { callAI, PaidDeclined, NoAiKeys } from '@/lib/ai-client'
+
+const AI_LABEL: Record<string, string> = { upstage: '업스테이지 Solar', gemini: 'Google Gemini', openai: 'OpenAI ChatGPT' }
 import { CHECK_TYPE_OPTIONS, type CheckType } from '@/lib/types'
 import type { Class } from '@/lib/types'
 import { fetchMyClasses } from '@/lib/my-classes'
@@ -95,13 +97,17 @@ export default function NewAssessmentPage() {
         setItems(prev => [...prev, ...newItems])
         toast.success(`AI가 ${newItems.length}개의 평가 항목을 생성했습니다.`, {
           description: data.paid
-            ? `${data.provider === 'upstage' ? '업스테이지 Solar' : data.provider} · 💳 유료 — 요금이 청구됩니다`
-            : 'Google Gemini · 무료',
+            ? `${AI_LABEL[data.provider ?? ''] ?? data.provider} · 💳 유료 — 요금이 청구됩니다`
+            : `${AI_LABEL[data.provider ?? ''] ?? data.provider} · 무료`,
         })
       }
     } catch (err: unknown) {
       // 유료를 «취소» 한 것은 잘못이 아니다 — 붉은 오류로 겁주지 않는다.
       if (err instanceof PaidDeclined) toast.info(err.message)
+      else if (err instanceof NoAiKeys) toast.error('등록된 AI API 키가 없습니다', {
+        description: '내 계정에서 업스테이지·Gemini·ChatGPT 키를 1개 이상 등록하세요.',
+        action: { label: '내 계정', onClick: () => { window.location.href = '/teacher/account' } },
+      })
       else toast.error(err instanceof Error ? err.message : 'AI 생성 실패')
     } finally {
       setAiLoading(false)

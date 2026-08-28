@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { generateText, PaidConfirmRequired, PROVIDER_LABEL, pricingNote } from '@/lib/ai'
+import { generateForUser } from '@/lib/ai-keys'
+import { PaidConfirmRequired, PROVIDER_LABEL, pricingNote, NO_AI_KEYS } from '@/lib/ai'
 
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+
+    const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()
 
     // allowPaid — 화면에서 «유료로 진행할까요?» 에 «예» 를 누른 그 한 번만 true 로 온다.
     const { prompt, subject, title, allowPaid } = await req.json()
@@ -30,11 +33,13 @@ export async function POST(req: Request) {
 반드시 JSON만 응답하세요. 코드블록 없이 순수 JSON 배열만:
 [{"name":"...","description":"...","check_type":"...","number_min":0,"number_max":100}]`
 
-    const { text, provider, paid } = await generateText({
-      system: systemPrompt,
-      user: `교과: ${subject || '미지정'}\n평가명: ${title || '미지정'}\n\n교사 요청: ${prompt}`,
-      allowPaid: allowPaid === true,
-    })
+    const { text, provider, paid } = await generateForUser(
+      { userId: user.id, isAdmin: profile?.is_admin === true, allowPaid: allowPaid === true },
+      {
+        system: systemPrompt,
+        user: `교과: ${subject || '미지정'}\n평가명: ${title || '미지정'}\n\n교사 요청: ${prompt}`,
+      }
+    )
 
     // JSON 파싱
     let items
@@ -60,6 +65,8 @@ export async function POST(req: Request) {
         error: err.message,
       }, { status: 402 })
     }
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'AI 생성 실패' }, { status: 500 })
+    const msg = err instanceof Error ? err.message : 'AI 생성 실패'
+    if (msg === NO_AI_KEYS) return NextResponse.json({ error: NO_AI_KEYS }, { status: 400 })
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
