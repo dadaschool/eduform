@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { generateText } from '@/lib/ai'
+import { generateText, PaidConfirmRequired, PROVIDER_LABEL, pricingNote } from '@/lib/ai'
 
 export async function POST(req: Request) {
   try {
@@ -8,7 +8,8 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-    const { prompt, subject, title } = await req.json()
+    // allowPaid — 화면에서 «유료로 진행할까요?» 에 «예» 를 누른 그 한 번만 true 로 온다.
+    const { prompt, subject, title, allowPaid } = await req.json()
 
     const systemPrompt = `당신은 중학교 교사를 돕는 평가 설계 전문가입니다. 2022 개정 교육과정 기반으로 수행평가 루브릭을 설계합니다.
 
@@ -29,9 +30,10 @@ export async function POST(req: Request) {
 반드시 JSON만 응답하세요. 코드블록 없이 순수 JSON 배열만:
 [{"name":"...","description":"...","check_type":"...","number_min":0,"number_max":100}]`
 
-    const { text, provider } = await generateText({
+    const { text, provider, paid } = await generateText({
       system: systemPrompt,
       user: `교과: ${subject || '미지정'}\n평가명: ${title || '미지정'}\n\n교사 요청: ${prompt}`,
+      allowPaid: allowPaid === true,
     })
 
     // JSON 파싱
@@ -45,8 +47,19 @@ export async function POST(req: Request) {
       else throw new Error('JSON 파싱 실패')
     }
 
-    return NextResponse.json({ items, provider })
+    return NextResponse.json({ items, provider, paid })
   } catch (err: unknown) {
+    // 무료 쪽이 죽고 유료만 남았다 — 몰래 쓰지 않고 화면에 되묻는다(402).
+    if (err instanceof PaidConfirmRequired) {
+      return NextResponse.json({
+        needPaidConfirm: true,
+        provider: err.provider,
+        providerLabel: PROVIDER_LABEL[err.provider],
+        pricing: pricingNote(err.provider),
+        freeFailures: err.freeFailures,
+        error: err.message,
+      }, { status: 402 })
+    }
     return NextResponse.json({ error: err instanceof Error ? err.message : 'AI 생성 실패' }, { status: 500 })
   }
 }
