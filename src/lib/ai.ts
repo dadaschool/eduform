@@ -25,12 +25,12 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
  * 않아도 다시 막힌다. 제공자를 새로 추가할 때 PRICING 에 반드시 적을 것.
  */
 
-export type AIProvider = 'gemini' | 'upstage' | 'openai'
+export type AIProvider = 'gemini' | 'upstage' | 'openai' | 'lmstudio'
 
 export interface ProviderKey {
   provider: AIProvider
   key: string
-  /** 어디서 온 키인지 — 오류 메시지에만 쓴다 ('내 키' | '학교 공용') */
+  /** 어디서 온 키인지 — 오류 메시지에만 쓴다 ('내 키' | '학교 공용' | '학교 로컬') */
   source?: string
 }
 
@@ -64,6 +64,13 @@ const PRICING: Record<AIProvider, Pricing> = {
     paidFrom: 0,
     note: 'OpenAI 는 무료 등급이 없습니다 — gpt-4o-mini 입력 $0.15 / 출력 $0.60 (100만 토큰당, 시세)',
   },
+  lmstudio: {
+    // 이 컴퓨터에서 직접 도는 로컬 모델이라 계정별 할당량도 청구서도 없다.
+    // 클라우드 배포(Vercel)에서는 애초에 LMSTUDIO_MODEL 이 비어 있어 폴백에
+    // 등장하지도 않는다 — 이 컴퓨터에서 로컬로 돌릴 때만(개발·테스트) 쓴다.
+    paidFrom: null,
+    note: '이 컴퓨터에서 도는 로컬 모델 — 요금 없음',
+  },
 }
 
 /** 사람이 읽는 제공자 이름. 확인 창과 토스트에 그대로 나간다. */
@@ -71,6 +78,7 @@ export const PROVIDER_LABEL: Record<AIProvider, string> = {
   gemini: 'Google Gemini',
   upstage: '업스테이지 Solar',
   openai: 'OpenAI ChatGPT',
+  lmstudio: '로컬 큐웬 (LM Studio)',
 }
 
 /**
@@ -140,6 +148,14 @@ const OPENAI_MODEL = 'gpt-4o-mini'
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions'
 
 /**
+ * 로컬 큐웬(LM Studio) — 이 앱이 돌고 있는 «그 컴퓨터» 에서만 열린다.
+ * 클라우드에 배포하면 이 주소가 아예 존재하지 않는다 — localhost 라서.
+ * 로그인이 없는 로컬 서버라 키 대신 모델 이름을 받고, 인증 헤더는 형식상 채운다.
+ */
+const LMSTUDIO_BASE_URL = (process.env.LMSTUDIO_URL || 'http://127.0.0.1:1234/v1').replace(/\/+$/, '')
+const LMSTUDIO_ENDPOINT = `${LMSTUDIO_BASE_URL}/chat/completions`
+
+/**
  * 제공자 한 곳당 제한 시간.
  *
  * 바깥으로 나가는 통신이 막힌 곳에서는 방화벽이 거절 응답을 주지 않고 패킷을
@@ -147,6 +163,9 @@ const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions'
  * 여러 번 기다리면 화면이 몇 분씩 돌아간다. 여기서 끊는다.
  */
 const TIMEOUT_MS = 20_000
+
+/** 로컬 모델은 GPU 없이 CPU 로 도는 경우가 흔해 클라우드보다 훨씬 느리다. */
+const LMSTUDIO_TIMEOUT_MS = 90_000
 
 async function generateWithGemini({ system, user }: GenerateOptions, key: string): Promise<string> {
   const genAI = new GoogleGenerativeAI(key)
@@ -158,12 +177,13 @@ async function generateWithGemini({ system, user }: GenerateOptions, key: string
   return text
 }
 
-/** Upstage 와 OpenAI 는 요청 형식이 같다 (OpenAI 호환 chat/completions). */
+/** Upstage · OpenAI · LM Studio(로컬) 는 요청 형식이 같다 (OpenAI 호환 chat/completions). */
 async function generateWithOpenAICompatible(
   { system, user }: GenerateOptions,
   key: string,
   endpoint: string,
-  model: string
+  model: string,
+  timeoutMs: number = TIMEOUT_MS
 ): Promise<string> {
   const messages = system
     ? [{ role: 'system', content: system }, { role: 'user', content: user }]
@@ -173,7 +193,7 @@ async function generateWithOpenAICompatible(
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, messages }),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   })
 
   if (!res.ok) {
@@ -195,6 +215,9 @@ async function runOne(provider: AIProvider, key: string, opts: GenerateOptions):
       return generateWithOpenAICompatible(opts, key, UPSTAGE_ENDPOINT, UPSTAGE_MODEL)
     case 'openai':
       return generateWithOpenAICompatible(opts, key, OPENAI_ENDPOINT, OPENAI_MODEL)
+    case 'lmstudio':
+      // key 자리에는 모델 이름이 온다(ai-keys.ts 참고). 인증은 없다.
+      return generateWithOpenAICompatible(opts, 'lm-studio', LMSTUDIO_ENDPOINT, key, LMSTUDIO_TIMEOUT_MS)
   }
 }
 
@@ -235,8 +258,12 @@ export async function generateText(opts: GenerateOptions, keys: ProviderKey[]): 
       const raw = err instanceof Error ? err.message : String(err)
       const name = err instanceof Error ? err.name : ''
       const timedOut = name === 'TimeoutError' || name === 'AbortError' || /timeout|aborted/i.test(raw)
+      const limitMs = provider === 'lmstudio' ? LMSTUDIO_TIMEOUT_MS : TIMEOUT_MS
+      const timeoutHint = provider === 'lmstudio'
+        ? '이 컴퓨터에서 LM Studio 서버가 켜져 있고 모델이 로드돼 있는지 확인하세요'
+        : '바깥 인터넷이 막혀 있을 수 있습니다'
       const message = timedOut
-        ? `${TIMEOUT_MS / 1000}초 안에 응답 없음 (바깥 인터넷이 막혀 있을 수 있습니다)`
+        ? `${limitMs / 1000}초 안에 응답 없음 (${timeoutHint})`
         : raw
       console.error(`[ai] ${label} 실패: ${message}`)
       failures.push(`${label}: ${message}`)
