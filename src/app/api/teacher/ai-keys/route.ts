@@ -49,7 +49,9 @@ export async function GET() {
     .order('priority', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ keys: data ?? [] })
+  // localModel — LMSTUDIO_MODEL 이 서버에 설정돼 있으면(이 컴퓨터에서 로컬로
+  // 돌릴 때만) 이 교사도 자동으로 쓸 수 있다. 연결 자체는 확인하지 않는다.
+  return NextResponse.json({ keys: data ?? [], localModel: process.env.LMSTUDIO_MODEL || null })
 }
 
 export async function PUT(req: Request) {
